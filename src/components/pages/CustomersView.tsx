@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Customer, Order, Transaction, Currency } from '../../types';
 import { UserPlus, Search, Phone, Building2, History, Users, FileText, Download, Printer, MapPin, Mail, Globe, FileSpreadsheet, Edit, Trash2, Truck, FileUp, Cake, X, DollarSign, ShoppingBag, Calendar, PlusCircle, CreditCard, ArrowRight } from 'lucide-react';
@@ -312,7 +313,7 @@ export const CustomersView: React.FC<Props> = ({ customers, orders, transactions
                                   <Users size={20} className="mr-2 text-blue-500"/> {t('customerDetails')}
                               </h4>
                               <div className="space-y-5">
-                                  <div className="grid grid-cols-3 items-center"><span className="text-slate-400 text-sm font-medium uppercase">{t('companyName')}</span><span className="col-span-2 font-semibold text-slate-800">{selectedCustomer.company}</span></div>
+                                  <div className="grid grid-cols-3 items-center"><span className="text-slate-400 text-sm font-medium uppercase">{t('companyName')}</span ><span className="col-span-2 font-semibold text-slate-800">{selectedCustomer.company}</span></div>
                                   <div className="grid grid-cols-3 items-center"><span className="text-slate-400 text-sm font-medium uppercase">{t('authorized')}</span><span className="col-span-2 font-medium text-slate-700">{selectedCustomer.name}</span></div>
                                   <div className="grid grid-cols-3 items-center"><span className="text-slate-400 text-sm font-medium uppercase">{t('phone')}</span><span className="col-span-2 font-mono text-slate-700 bg-slate-50 inline-block w-fit px-2 py-1 rounded">{selectedCustomer.phone}</span></div>
                                   <div className="grid grid-cols-3 items-center"><span className="text-slate-400 text-sm font-medium uppercase">{t('email')}</span><span className="col-span-2 text-blue-600">{selectedCustomer.email || '-'}</span></div>
@@ -507,7 +508,7 @@ export const CustomersView: React.FC<Props> = ({ customers, orders, transactions
                                 <td className="p-5 text-center">
                                     <div className="flex justify-center gap-2">
                                         <button 
-                                            onClick={(e) => { e.stopPropagation(); openEditModal(e, c); }} 
+                                            onClick={(e) => openEditModal(e, c)} 
                                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" 
                                             title={t('edit')}
                                         >

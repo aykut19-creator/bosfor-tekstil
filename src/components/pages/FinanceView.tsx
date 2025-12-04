@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AppState, Currency, Transaction } from '../../types';
 import { Wallet, Calendar, Edit, Save, Plus, ArrowRightLeft, Trash2 } from 'lucide-react';

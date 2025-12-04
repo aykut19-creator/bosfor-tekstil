@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AppState, Supplier, Transaction } from '../../types';
 import { UserPlus, Search, Building2, History, Users, FileText, Briefcase, Plus, Edit, Trash2 } from 'lucide-react';

@@ -1,3 +1,4 @@
+
 import { Product, Customer, Order, Transaction, Currency, OrderStatus, Supplier } from '../types';
 
 export const initialProducts: Product[] = [

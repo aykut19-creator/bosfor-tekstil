@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Product } from '../../types';
 import { Plus, Search, FileDown, FileUp, Edit, Image as ImageIcon, CheckSquare, Square, Printer, Grid, X, Loader2, FileText } from 'lucide-react';
