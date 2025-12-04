@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { View, AppState, Product, Customer, Order, Transaction, OrderStatus, Currency, Supplier, Language } from './types';
-import { initialProducts, initialCustomers, initialOrders, initialTransactions, initialSuppliers } from './services/mockData';
+import { View, AppState, Product, Customer, Order, Transaction, OrderStatus, Currency, Supplier, Language, User } from './types';
+import { initialProducts, initialCustomers, initialOrders, initialTransactions, initialSuppliers, initialUsers } from './services/mockData';
 import { dictionary } from './services/translations';
 
 // Pages
@@ -15,7 +15,9 @@ import { FinanceView } from './components/pages/FinanceView';
 import { PurchaseView } from './components/pages/PurchaseView';
 import { ExpensesView } from './components/pages/ExpensesView';
 import { ReportsView } from './components/pages/ReportsView';
+import { UserManagementView } from './components/pages/UserManagementView';
 import { AIChat } from './components/AIChat';
+import { Auth } from './components/Auth';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
@@ -26,6 +28,8 @@ const App: React.FC = () => {
 
   // Central State Management
   const [state, setState] = useState<AppState>({
+    users: initialUsers,
+    currentUser: null, // Start logged out
     products: initialProducts,
     customers: initialCustomers,
     suppliers: initialSuppliers,
@@ -33,7 +37,41 @@ const App: React.FC = () => {
     transactions: initialTransactions,
   });
 
-  // State Helpers
+  // --- AUTH HANDLERS ---
+  const handleLogin = (user: User) => {
+      setState(prev => ({ ...prev, currentUser: user }));
+  };
+
+  const handleRegister = (newUser: Omit<User, 'id' | 'status'>) => {
+      const user: User = {
+          ...newUser,
+          id: `u-${Date.now()}`,
+          status: 'pending' // Force pending status for new registrations
+      };
+      setState(prev => ({ ...prev, users: [...prev.users, user] }));
+  };
+
+  const handleLogout = () => {
+      setState(prev => ({ ...prev, currentUser: null }));
+      setCurrentView('DASHBOARD');
+  };
+
+  // Admin Actions
+  const handleApproveUser = (id: string) => {
+      setState(prev => ({
+          ...prev,
+          users: prev.users.map(u => u.id === id ? { ...u, status: 'active' } : u)
+      }));
+  };
+
+  const handleRejectUser = (id: string) => {
+      setState(prev => ({
+          ...prev,
+          users: prev.users.filter(u => u.id !== id)
+      }));
+  };
+
+  // --- DATA HELPERS ---
   const addProduct = (p: Product) => setState(prev => ({ ...prev, products: [...prev.products, p] }));
   const updateProduct = (p: Product) => setState(prev => ({ ...prev, products: prev.products.map(x => x.id === p.id ? p : x) }));
   
@@ -41,7 +79,6 @@ const App: React.FC = () => {
   const updateCustomer = (c: Customer) => setState(prev => ({ ...prev, customers: prev.customers.map(x => x.id === c.id ? c : x) }));
   
   const deleteCustomer = (id: string) => {
-      // Validation: Check if customer has any linked data
       const hasOrders = state.orders.some(o => o.customerId === id);
       const hasTransactions = state.transactions.some(t => t.customerId === id);
 
@@ -61,7 +98,6 @@ const App: React.FC = () => {
   const addOrder = (o: Order) => setState(prev => ({ ...prev, orders: [...prev.orders, o] }));
   const updateOrder = (o: Order) => setState(prev => ({ ...prev, orders: prev.orders.map(x => x.id === o.id ? o : x) }));
   
-  // CORE LOGIC: Determines how a transaction affects a balance
   const calculateBalanceImpact = (t: Transaction): { custImpact: number, suppImpact: number } => {
     let custImpact = 0;
     let suppImpact = 0;
@@ -207,6 +243,14 @@ const App: React.FC = () => {
       });
   };
 
+  // --- RENDER ---
+  
+  // 1. Check Authentication
+  if (!state.currentUser) {
+      return <Auth onLogin={handleLogin} onRegister={handleRegister} users={state.users} t={t} />;
+  }
+
+  // 2. Render Main App Content
   const renderContent = () => {
     const props = { t, lang: language };
     
@@ -220,13 +264,14 @@ const App: React.FC = () => {
       case 'PURCHASE': return <PurchaseView state={state} onProcessReturn={processReturn} {...props} />;
       case 'EXPENSES': return <ExpensesView state={state} onAddSupplier={addSupplier} onAddTransaction={addTransaction} onUpdateTransaction={updateTransaction} onDeleteTransaction={deleteTransaction} {...props} />;
       case 'REPORTS': return <ReportsView state={state} {...props} />;
+      case 'USERS': return <UserManagementView users={state.users} onApprove={handleApproveUser} onReject={handleRejectUser} t={t} />;
       default: return <Dashboard state={state} {...props} />;
     }
   };
 
   return (
     <div className="flex bg-slate-50 min-h-screen font-sans">
-      <Sidebar currentView={currentView} onChangeView={setCurrentView} t={t} />
+      <Sidebar currentView={currentView} onChangeView={setCurrentView} onLogout={handleLogout} currentUser={state.currentUser} t={t} />
       <main className="flex-1 ml-64 p-8">
         <header className="mb-8 flex justify-between items-center">
             <div>
@@ -252,10 +297,12 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-3">
                     <div className="text-right">
-                        <p className="text-sm font-semibold text-slate-700">Admin User</p>
-                        <p className="text-xs text-slate-500">Istanbul HQ</p>
+                        <p className="text-sm font-semibold text-slate-700">{state.currentUser?.fullName}</p>
+                        <p className="text-xs text-slate-500 capitalize">{state.currentUser?.role}</p>
                     </div>
-                    <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">AU</div>
+                    <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+                        {state.currentUser?.username.charAt(0).toUpperCase()}
+                    </div>
                 </div>
             </div>
         </header>

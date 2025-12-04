@@ -3,6 +3,27 @@ import { Language } from '../types';
 
 export const dictionary: Record<Language, Record<string, string>> = {
   TR: {
+    // Auth
+    loginTitle: 'ERP Giriş',
+    registerTitle: 'Kayıt Ol',
+    username: 'Kullanıcı Adı',
+    password: 'Şifre',
+    fullName: 'Ad Soyad',
+    login: 'Giriş Yap',
+    register: 'Kayıt Ol',
+    noAccount: 'Hesabınız yok mu? Erişim isteyin.',
+    haveAccount: 'Zaten hesabınız var mı? Giriş yapın.',
+    authError: 'Kullanıcı adı veya şifre hatalı.',
+    pendingError: 'Üyeliğiniz henüz onaylanmamıştır. Lütfen yöneticinin onaylamasını bekleyin.',
+    registerSuccess: 'Kayıt talebiniz alındı. Yönetici onayı bekleniyor.',
+    users: 'Kullanıcılar',
+    userManagement: 'Kullanıcı Yönetimi',
+    pendingRequests: 'Bekleyen Talepler',
+    activeUsers: 'Aktif Kullanıcılar',
+    approve: 'Onayla',
+    reject: 'Reddet',
+    logout: 'Çıkış Yap',
+    
     // Sidebar
     dashboard: 'Panel',
     stock: 'Stok Yönetimi',
@@ -151,6 +172,27 @@ export const dictionary: Record<Language, Record<string, string>> = {
     aiIntro: 'Merhaba! Ben sizin yapay zeka asistanınızım. Stoklarınız, müşterileriniz veya finansal durumunuz hakkında sorular sorabilirsiniz.'
   },
   RU: {
+    // Auth
+    loginTitle: 'Вход в ERP',
+    registerTitle: 'Регистрация',
+    username: 'Имя пользователя',
+    password: 'Пароль',
+    fullName: 'Полное имя',
+    login: 'Войти',
+    register: 'Зарегистрироваться',
+    noAccount: 'Нет аккаунта? Запросить доступ.',
+    haveAccount: 'Уже есть аккаунт? Войти.',
+    authError: 'Неверное имя пользователя или пароль.',
+    pendingError: 'Ваш аккаунт ожидает подтверждения администратором.',
+    registerSuccess: 'Заявка отправлена. Ожидайте подтверждения.',
+    users: 'Пользователи',
+    userManagement: 'Управление пользователями',
+    pendingRequests: 'Ожидающие заявки',
+    activeUsers: 'Активные пользователи',
+    approve: 'Одобрить',
+    reject: 'Отклонить',
+    logout: 'Выйти',
+
     // Sidebar
     dashboard: 'Дашборд',
     stock: 'Склад',

@@ -12,6 +12,19 @@ export enum OrderStatus {
   COMPLETED = 'Completed',
 }
 
+export type UserRole = 'admin' | 'user';
+export type UserStatus = 'active' | 'pending' | 'rejected';
+
+export interface User {
+  id: string;
+  username: string;
+  password: string; 
+  fullName: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+}
+
 export interface Product {
   id: string;
   ean: string; 
@@ -88,6 +101,8 @@ export interface Transaction {
 }
 
 export interface AppState {
+  users: User[];
+  currentUser: User | null;
   products: Product[];
   customers: Customer[];
   suppliers: Supplier[];
@@ -95,4 +110,4 @@ export interface AppState {
   transactions: Transaction[];
 }
 
-export type View = 'DASHBOARD' | 'STOCK' | 'CUSTOMERS' | 'ORDERS' | 'SALES' | 'FINANCE' | 'PURCHASE' | 'EXPENSES' | 'REPORTS';
+export type View = 'DASHBOARD' | 'STOCK' | 'CUSTOMERS' | 'ORDERS' | 'SALES' | 'FINANCE' | 'PURCHASE' | 'EXPENSES' | 'REPORTS' | 'USERS';
