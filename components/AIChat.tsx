@@ -41,8 +41,16 @@ export const AIChat: React.FC<Props> = ({ state, language, t }) => {
     setIsLoading(true);
 
     try {
-      // Initialize Gemini
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+      const apiKey = process.env.API_KEY;
+      
+      if (!apiKey) {
+        setMessages(prev => [...prev, { role: 'model', text: "API Key not configured in .env file (process.env.API_KEY)." }]);
+        setIsLoading(false);
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey: apiKey });
       
       // Prepare Context Data
       const contextData = {
@@ -103,7 +111,6 @@ export const AIChat: React.FC<Props> = ({ state, language, t }) => {
 
   return (
     <>
-      {/* Floating Button */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
@@ -113,10 +120,8 @@ export const AIChat: React.FC<Props> = ({ state, language, t }) => {
         </button>
       )}
 
-      {/* Chat Window */}
       {isOpen && (
         <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col z-50 overflow-hidden font-sans">
-          {/* Header */}
           <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-4 flex justify-between items-center text-white">
             <div className="flex items-center gap-2">
                 <Sparkles size={20} />
@@ -127,7 +132,6 @@ export const AIChat: React.FC<Props> = ({ state, language, t }) => {
             </button>
           </div>
 
-          {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -160,7 +164,6 @@ export const AIChat: React.FC<Props> = ({ state, language, t }) => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
           <div className="p-3 bg-white border-t border-slate-200">
             <div className="flex gap-2 items-center bg-slate-100 rounded-full px-4 py-2 border border-slate-200 focus-within:ring-2 focus-within:ring-violet-500 focus-within:bg-white transition-all">
                 <input
