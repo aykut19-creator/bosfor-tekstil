@@ -1,11 +1,10 @@
-
 import { Product, Customer, Order, Transaction, Currency, OrderStatus, Supplier, User } from '../types';
 
 export const initialUsers: User[] = [
   {
     id: 'u1',
     username: 'admin',
-    password: 'admin123', // In a real app, passwords should be hashed
+    password: 'admin123', // In a real app, this would be hashed
     fullName: 'System Administrator',
     email: 'admin@bosfortekstil.com',
     role: 'admin',
@@ -18,7 +17,7 @@ export const initialUsers: User[] = [
     fullName: 'Demo User',
     email: 'demo@example.com',
     role: 'user',
-    status: 'pending'
+    status: 'pending' // pending approval
   }
 ];
 

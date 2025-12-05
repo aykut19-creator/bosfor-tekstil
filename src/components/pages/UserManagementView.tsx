@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { User } from '../../types';
 import { CheckCircle, XCircle, Shield, User as UserIcon } from 'lucide-react';

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User } from '../types';
 import { Lock, User as UserIcon, Mail, ShieldCheck } from 'lucide-react';
@@ -47,7 +46,7 @@ export const Auth: React.FC<Props> = ({ onLogin, onRegister, users, t }) => {
         role: 'user'
       });
       setSuccess(t('registerSuccess'));
-      setIsLogin(true);
+      setIsLogin(true); // Switch to login to see success message
     }
   };
 
@@ -118,8 +117,8 @@ export const Auth: React.FC<Props> = ({ onLogin, onRegister, users, t }) => {
               </div>
             </div>
 
-            {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg font-medium">{error}</div>}
-            {success && <div className="p-3 bg-green-50 text-green-600 text-sm rounded-lg font-medium">{success}</div>}
+            {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg font-medium animate-in fade-in slide-in-from-top-2">{error}</div>}
+            {success && <div className="p-3 bg-green-50 text-green-600 text-sm rounded-lg font-medium animate-in fade-in slide-in-from-top-2">{success}</div>}
 
             <button className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">
               {isLogin ? t('login') : t('register')}

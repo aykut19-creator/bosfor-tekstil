@@ -1,4 +1,3 @@
-
 export type Language = 'TR' | 'RU';
 
 export enum Currency {
