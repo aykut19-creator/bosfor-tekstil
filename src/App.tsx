@@ -94,14 +94,26 @@ const App: React.FC = () => {
       setState(prev => ({ ...prev, currentUser: user }));
   };
 
-  const handleRegister = (newUser: Omit<User, 'id' | 'status'>) => {
+    // EĞER SİSTEMDE HİÇ KULLANICI YOKSA, İLK KAYIT OLAN 'ADMIN' VE 'ACTIVE' OLSUN
+      const isFirstUser = state.users.length === 0;
+
       const user: User = {
           ...newUser,
           id: `u-${Date.now()}`,
-          status: 'pending' 
+          // İlk kullanıcı ise direkt aktif ve admin, değilse pending ve user
+          status: isFirstUser ? 'active' : 'pending',
+          role: isFirstUser ? 'admin' : 'user'
       };
-      updateState(prev => ({ ...prev, users: [...prev.users, user] }));
-      alert(t('registerSuccess'));
+
+      // Yeni üyeyi veritabanına kaydet
+      const updatedUsers = [...state.users, user];
+      updateState(prev => ({ ...prev, users: updatedUsers }));
+      
+      if (isFirstUser) {
+          alert("Sistemin ilk kullanıcısı olduğunuz için YÖNETİCİ olarak kaydedildiniz. Giriş yapabilirsiniz.");
+      } else {
+          alert(t('registerSuccess'));
+      }
   };
 
   const handleLogout = () => {
