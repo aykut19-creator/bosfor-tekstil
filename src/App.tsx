@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { View, AppState, Product, Customer, Order, Transaction, OrderStatus, Currency, Supplier, Language, User } from './types';
@@ -29,7 +28,6 @@ const App: React.FC = () => {
   
   const t = (key: string) => dictionary[language][key] || key;
 
-  // State başlangıcı: currentUser NULL olmalı
   const [state, setState] = useState<AppState>({
     users: [],
     currentUser: null, 
@@ -45,11 +43,13 @@ const App: React.FC = () => {
     const unsubscribe = onSnapshot(doc(db, "erp_data", "main_state"), (docSnapshot) => {
         if (docSnapshot.exists()) {
             const data = docSnapshot.data() as AppState;
+            // Mevcut oturumu koru, diğer verileri buluttan al
             setState(prev => ({
                 ...data,
-                currentUser: prev.currentUser // Oturumu koru
+                currentUser: prev.currentUser 
             }));
         } else {
+            // Eğer veritabanı boşsa başlat
             console.log("Initializing Database...");
             const initialState = {
                 users: initialUsers,
@@ -72,7 +72,10 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Verileri Firebase'e Kaydet
   const saveToFirebase = async (newState: AppState) => {
+      // currentUser'ı veritabanına kaydetme
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { currentUser, ...dataToSave } = newState; 
       try {
           await setDoc(doc(db, "erp_data", "main_state"), dataToSave, { merge: true });
@@ -81,6 +84,7 @@ const App: React.FC = () => {
       }
   };
 
+  // State'i güncelle ve Firebase'e yaz
   const updateState = (updater: (prev: AppState) => AppState) => {
       setState(prev => {
           const newState = updater(prev);
@@ -94,20 +98,19 @@ const App: React.FC = () => {
       setState(prev => ({ ...prev, currentUser: user }));
   };
 
-    // EĞER SİSTEMDE HİÇ KULLANICI YOKSA, İLK KAYIT OLAN 'ADMIN' VE 'ACTIVE' OLSUN
+  const handleRegister = (newUser: Omit<User, 'id' | 'status'>) => {
+      // EĞER SİSTEMDE HİÇ KULLANICI YOKSA, İLK KAYIT OLAN 'ADMIN' VE 'ACTIVE' OLSUN
       const isFirstUser = state.users.length === 0;
 
       const user: User = {
           ...newUser,
           id: `u-${Date.now()}`,
-          // İlk kullanıcı ise direkt aktif ve admin, değilse pending ve user
           status: isFirstUser ? 'active' : 'pending',
           role: isFirstUser ? 'admin' : 'user'
       };
-
+      
       // Yeni üyeyi veritabanına kaydet
-      const updatedUsers = [...state.users, user];
-      updateState(prev => ({ ...prev, users: updatedUsers }));
+      updateState(prev => ({ ...prev, users: [...prev.users, user] }));
       
       if (isFirstUser) {
           alert("Sistemin ilk kullanıcısı olduğunuz için YÖNETİCİ olarak kaydedildiniz. Giriş yapabilirsiniz.");
@@ -121,6 +124,7 @@ const App: React.FC = () => {
       setCurrentView('DASHBOARD');
   };
 
+  // Admin İşlemleri
   const handleApproveUser = (id: string) => {
       updateState(prev => ({
           ...prev,
@@ -171,6 +175,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (isLoading) return; 
+    
     setState(prev => {
         const newCustomers = prev.customers.map(c => {
             const balance = prev.transactions
@@ -178,14 +183,17 @@ const App: React.FC = () => {
                 .reduce((acc, t) => acc + calculateBalanceImpact(t).custImpact, 0);
             return { ...c, balanceUsd: balance };
         });
+
         const newSuppliers = prev.suppliers.map(s => {
             const balance = prev.transactions
                 .filter(t => t.supplierId === s.id)
                 .reduce((acc, t) => acc + calculateBalanceImpact(t).suppImpact, 0);
             return { ...s, balanceUsd: balance };
         });
+
         const custChanged = JSON.stringify(newCustomers) !== JSON.stringify(prev.customers);
         const suppChanged = JSON.stringify(newSuppliers) !== JSON.stringify(prev.suppliers);
+
         if (custChanged || suppChanged) {
             return { ...prev, customers: newCustomers, suppliers: newSuppliers };
         }
@@ -256,6 +264,7 @@ const App: React.FC = () => {
       });
   };
 
+  // --- YÜKLENİYOR ---
   if (isLoading) {
       return (
           <div className="flex h-screen items-center justify-center bg-slate-100">
@@ -267,7 +276,7 @@ const App: React.FC = () => {
       );
   }
 
-  // BURASI KRİTİK NOKTA: KULLANICI YOKSA GİRİŞ EKRANINI GÖSTER
+  // --- GİRİŞ KONTROLÜ ---
   if (!state.currentUser) {
       return (
         <>
@@ -280,6 +289,7 @@ const App: React.FC = () => {
       );
   }
 
+  // --- ANA EKRAN ---
   const renderContent = () => {
     const props = { t, lang: language };
     switch (currentView) {
