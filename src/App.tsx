@@ -17,6 +17,7 @@ import { ReportsView } from './components/pages/ReportsView';
 import { UserManagementView } from './components/pages/UserManagementView';
 import { AIChat } from './components/AIChat';
 import { Auth } from './components/Auth';
+import { LogOut } from 'lucide-react'; // Added LogOut icon
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
@@ -25,16 +26,40 @@ const App: React.FC = () => {
   // Translation helper
   const t = (key: string) => dictionary[language][key] || key;
 
-  // Central State Management
-  const [state, setState] = useState<AppState>({
-    users: initialUsers,
-    currentUser: null, // Start logged out
-    products: initialProducts,
-    customers: initialCustomers,
-    suppliers: initialSuppliers,
-    orders: initialOrders,
-    transactions: initialTransactions,
+  // --- CENTRAL STATE MANAGEMENT WITH PERSISTENCE ---
+  const [state, setState] = useState<AppState>(() => {
+    try {
+      const savedData = localStorage.getItem('bosfor_erp_state');
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        // Basic validation to ensure essential arrays exist
+        if (parsed && parsed.users && parsed.products) {
+            return parsed;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load state from LocalStorage, falling back to initial data:", e);
+      // Optional: Clear bad data
+      // localStorage.removeItem('bosfor_erp_state'); 
+    }
+    return {
+      users: initialUsers,
+      currentUser: null, 
+      products: initialProducts,
+      customers: initialCustomers,
+      suppliers: initialSuppliers,
+      orders: initialOrders,
+      transactions: initialTransactions,
+    };
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('bosfor_erp_state', JSON.stringify(state));
+    } catch (e) {
+      console.error("Failed to save state to LocalStorage:", e);
+    }
+  }, [state]);
 
   // --- AUTH HANDLERS ---
   const handleLogin = (user: User) => {
@@ -45,9 +70,10 @@ const App: React.FC = () => {
       const user: User = {
           ...newUser,
           id: `u-${Date.now()}`,
-          status: 'pending' // Force pending status for new registrations
+          status: 'pending' 
       };
       setState(prev => ({ ...prev, users: [...prev.users, user] }));
+      alert(t('registerSuccess'));
   };
 
   const handleLogout = () => {
@@ -136,7 +162,7 @@ const App: React.FC = () => {
         }
         return prev;
     });
-  }, [state.transactions]);
+  }, [state.transactions]); 
 
   const addTransaction = (t: Transaction) => {
     setState(prev => ({
@@ -242,14 +268,20 @@ const App: React.FC = () => {
       });
   };
 
-  // --- RENDER ---
-  
-  // 1. Check Authentication
+  // --- AUTHENTICATION CHECK ---
   if (!state.currentUser) {
-      return <Auth onLogin={handleLogin} onRegister={handleRegister} users={state.users} t={t} />;
+      return (
+        <>
+            <Auth onLogin={handleLogin} onRegister={handleRegister} users={state.users} t={t} />
+            <div className="fixed top-4 right-4 flex gap-2 z-50">
+                <button onClick={() => setLanguage('TR')} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'TR' ? 'bg-blue-600 text-white shadow-md' : 'bg-white/80 text-slate-700 hover:bg-white'}`}>TR</button>
+                <button onClick={() => setLanguage('RU')} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'RU' ? 'bg-blue-600 text-white shadow-md' : 'bg-white/80 text-slate-700 hover:bg-white'}`}>RU</button>
+            </div>
+        </>
+      );
   }
 
-  // 2. Render Main App Content
+  // --- MAIN APP RENDER ---
   const renderContent = () => {
     const props = { t, lang: language };
     
@@ -281,27 +313,21 @@ const App: React.FC = () => {
             </div>
             <div className="flex items-center space-x-6">
                 <div className="flex bg-white rounded-lg shadow-sm border border-slate-200 p-1">
-                    <button 
-                      onClick={() => setLanguage('TR')}
-                      className={`px-3 py-1 text-xs font-bold rounded transition-colors ${language === 'TR' ? 'bg-red-50 text-red-600' : 'text-slate-500 hover:bg-slate-50'}`}
-                    >
-                      TR
-                    </button>
-                    <button 
-                      onClick={() => setLanguage('RU')}
-                      className={`px-3 py-1 text-xs font-bold rounded transition-colors ${language === 'RU' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}
-                    >
-                      RU
-                    </button>
+                    <button onClick={() => setLanguage('TR')} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${language === 'TR' ? 'bg-red-50 text-red-600' : 'text-slate-500 hover:bg-slate-50'}`}>TR</button>
+                    <button onClick={() => setLanguage('RU')} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${language === 'RU' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>RU</button>
                 </div>
                 <div className="flex items-center space-x-3">
-                    <div className="text-right">
+                    <div className="text-right hidden sm:block">
                         <p className="text-sm font-semibold text-slate-700">{state.currentUser?.fullName}</p>
                         <p className="text-xs text-slate-500 capitalize">{state.currentUser?.role}</p>
                     </div>
                     <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
                         {state.currentUser?.username.charAt(0).toUpperCase()}
                     </div>
+                    {/* Added Logout Button to Header as requested */}
+                    <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" title={t('logout')}>
+                        <LogOut size={20}/>
+                    </button>
                 </div>
             </div>
         </header>
