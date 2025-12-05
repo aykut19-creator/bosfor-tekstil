@@ -37,7 +37,6 @@ export const Auth: React.FC<Props> = ({ onLogin, onRegister, users, t }) => {
         setError(t('authError'));
       }
     } else {
-      // Simulate registration request
       onRegister({
         username: formData.username,
         password: formData.password,
@@ -46,7 +45,7 @@ export const Auth: React.FC<Props> = ({ onLogin, onRegister, users, t }) => {
         role: 'user'
       });
       setSuccess(t('registerSuccess'));
-      setIsLogin(true); // Switch to login to see success message
+      setIsLogin(true);
     }
   };
 
