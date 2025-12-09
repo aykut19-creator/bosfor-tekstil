@@ -37,6 +37,7 @@ export const Auth: React.FC<Props> = ({ onLogin, onRegister, users, t }) => {
         setError(t('authError'));
       }
     } else {
+      // Register new user (Pending)
       onRegister({
         username: formData.username,
         password: formData.password,

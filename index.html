@@ -1,14 +1,11 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BOSFOR TEKSTIL ERP Pro</title>
-    <!-- Using Tailwind CDN for simplicity in this specific setup, usually managed by PostCSS in production -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      /* Custom Scrollbar for nicer tables */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -27,22 +24,24 @@
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "react": "https://aistudiocdn.com/react@^19.2.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5",
     "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
-    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5",
     "vite": "https://aistudiocdn.com/vite@^7.2.6",
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/"
+    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/",
+    "path": "https://aistudiocdn.com/path@^0.12.7"
   }
 }
 </script>
 </head>
   <body class="bg-slate-50 text-slate-900 font-sans antialiased">
     <div id="root"></div>
+    <!-- Points correctly to src/main.tsx -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

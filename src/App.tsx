@@ -3,8 +3,6 @@ import { Sidebar } from './components/Sidebar';
 import { View, AppState, Product, Customer, Order, Transaction, OrderStatus, Currency, Supplier, Language, User } from './types';
 import { initialProducts, initialCustomers, initialOrders, initialTransactions, initialSuppliers, initialUsers } from './services/mockData';
 import { dictionary } from './services/translations';
-import { db } from './firebase'; 
-import { doc, setDoc, onSnapshot } from "firebase/firestore"; 
 
 // Pages
 import { Dashboard } from './components/pages/Dashboard';
@@ -24,96 +22,58 @@ import { LogOut, Loader2 } from 'lucide-react';
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [language, setLanguage] = useState<Language>('TR');
-  const [isLoading, setIsLoading] = useState(true); 
+  const [isLoading, setIsLoading] = useState(true);
   
   const t = (key: string) => dictionary[language][key] || key;
 
-  const [state, setState] = useState<AppState>({
-    users: [],
-    currentUser: null, 
-    products: [],
-    customers: [],
-    suppliers: [],
-    orders: [],
-    transactions: [],
+  // --- LOCAL STORAGE STATE MANAGEMENT ---
+  const [state, setState] = useState<AppState>(() => {
+    try {
+      const saved = localStorage.getItem('bosfor_erp_v5_local');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...parsed, currentUser: null };
+      }
+    } catch (e) {
+      console.error("Load Error:", e);
+    }
+    return {
+      users: initialUsers,
+      currentUser: null, 
+      products: initialProducts,
+      customers: initialCustomers,
+      suppliers: initialSuppliers,
+      orders: initialOrders,
+      transactions: initialTransactions,
+    };
   });
 
-  // --- FIREBASE BAĞLANTISI ---
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, "erp_data", "main_state"), (docSnapshot) => {
-        if (docSnapshot.exists()) {
-            const data = docSnapshot.data() as AppState;
-            // Mevcut oturumu koru, diğer verileri buluttan al
-            setState(prev => ({
-                ...data,
-                currentUser: prev.currentUser 
-            }));
-        } else {
-            // Eğer veritabanı boşsa başlat
-            console.log("Initializing Database...");
-            const initialState = {
-                users: initialUsers,
-                currentUser: null,
-                products: initialProducts,
-                customers: initialCustomers,
-                suppliers: initialSuppliers,
-                orders: initialOrders,
-                transactions: initialTransactions,
-            };
-            setDoc(doc(db, "erp_data", "main_state"), initialState);
-            setState(initialState);
-        }
-        setIsLoading(false);
-    }, (error) => {
-        console.error("Firebase Error:", error);
-        setIsLoading(false);
-    });
+    setIsLoading(false);
+    try {
+      localStorage.setItem('bosfor_erp_v5_local', JSON.stringify(state));
+    } catch (e) {
+      console.error("Save Error:", e);
+    }
+  }, [state]);
 
-    return () => unsubscribe();
-  }, []);
-
-  // Verileri Firebase'e Kaydet
-  const saveToFirebase = async (newState: AppState) => {
-      // currentUser'ı veritabanına kaydetme
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { currentUser, ...dataToSave } = newState; 
-      try {
-          await setDoc(doc(db, "erp_data", "main_state"), dataToSave, { merge: true });
-      } catch (e) {
-          console.error("Error saving to Firebase", e);
-      }
-  };
-
-  // State'i güncelle ve Firebase'e yaz
-  const updateState = (updater: (prev: AppState) => AppState) => {
-      setState(prev => {
-          const newState = updater(prev);
-          saveToFirebase(newState);
-          return newState;
-      });
-  };
-
-  // --- AUTH İŞLEMLERİ ---
+  // --- AUTH ---
   const handleLogin = (user: User) => {
       setState(prev => ({ ...prev, currentUser: user }));
   };
 
   const handleRegister = (newUser: Omit<User, 'id' | 'status'>) => {
-      // EĞER SİSTEMDE HİÇ KULLANICI YOKSA, İLK KAYIT OLAN 'ADMIN' VE 'ACTIVE' OLSUN
       const isFirstUser = state.users.length === 0;
-
       const user: User = {
           ...newUser,
           id: `u-${Date.now()}`,
           status: isFirstUser ? 'active' : 'pending',
           role: isFirstUser ? 'admin' : 'user'
       };
-      
-      // Yeni üyeyi veritabanına kaydet
-      updateState(prev => ({ ...prev, users: [...prev.users, user] }));
+      setState(prev => ({ ...prev, users: [...prev.users, user] }));
       
       if (isFirstUser) {
-          alert("Sistemin ilk kullanıcısı olduğunuz için YÖNETİCİ olarak kaydedildiniz. Giriş yapabilirsiniz.");
+          alert("İlk kullanıcı olduğunuz için YÖNETİCİ olarak kaydedildiniz.");
       } else {
           alert(t('registerSuccess'));
       }
@@ -124,28 +84,25 @@ const App: React.FC = () => {
       setCurrentView('DASHBOARD');
   };
 
-  // Admin İşlemleri
   const handleApproveUser = (id: string) => {
-      updateState(prev => ({
+      setState(prev => ({
           ...prev,
           users: prev.users.map(u => u.id === id ? { ...u, status: 'active' } : u)
       }));
   };
 
   const handleRejectUser = (id: string) => {
-      updateState(prev => ({
+      setState(prev => ({
           ...prev,
           users: prev.users.filter(u => u.id !== id)
       }));
   };
 
-  // --- DİĞER İŞLEMLER ---
-  const addProduct = (p: Product) => updateState(prev => ({ ...prev, products: [...prev.products, p] }));
-  const updateProduct = (p: Product) => updateState(prev => ({ ...prev, products: prev.products.map(x => x.id === p.id ? p : x) }));
-  
-  const addCustomer = (c: Customer) => updateState(prev => ({ ...prev, customers: [...prev.customers, c] }));
-  const updateCustomer = (c: Customer) => updateState(prev => ({ ...prev, customers: prev.customers.map(x => x.id === c.id ? c : x) }));
-  
+  // --- DATA HELPERS ---
+  const addProduct = (p: Product) => setState(prev => ({ ...prev, products: [...prev.products, p] }));
+  const updateProduct = (p: Product) => setState(prev => ({ ...prev, products: prev.products.map(x => x.id === p.id ? p : x) }));
+  const addCustomer = (c: Customer) => setState(prev => ({ ...prev, customers: [...prev.customers, c] }));
+  const updateCustomer = (c: Customer) => setState(prev => ({ ...prev, customers: prev.customers.map(x => x.id === c.id ? c : x) }));
   const deleteCustomer = (id: string) => {
       const hasOrders = state.orders.some(o => o.customerId === id);
       const hasTransactions = state.transactions.some(t => t.customerId === id);
@@ -153,13 +110,15 @@ const App: React.FC = () => {
           alert(t('cannotDeleteCustomer'));
           return;
       }
-      updateState(prev => ({ ...prev, customers: prev.customers.filter(c => c.id !== id) }));
+      setState(prev => ({ ...prev, customers: prev.customers.filter(c => c.id !== id) }));
   };
+  const addSupplier = (s: Supplier) => setState(prev => ({ ...prev, suppliers: [...prev.suppliers, s] }));
+  const addOrder = (o: Order) => setState(prev => ({ ...prev, orders: [...prev.orders, o] }));
+  const updateOrder = (o: Order) => setState(prev => ({ ...prev, orders: prev.orders.map(x => x.id === o.id ? o : x) }));
+  const addTransaction = (t: Transaction) => setState(prev => ({ ...prev, transactions: [t, ...prev.transactions] }));
+  const updateTransaction = (updatedTx: Transaction) => setState(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === updatedTx.id ? updatedTx : t) }));
+  const deleteTransaction = (id: string) => setState(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
 
-  const addSupplier = (s: Supplier) => updateState(prev => ({ ...prev, suppliers: [...prev.suppliers, s] }));
-  const addOrder = (o: Order) => updateState(prev => ({ ...prev, orders: [...prev.orders, o] }));
-  const updateOrder = (o: Order) => updateState(prev => ({ ...prev, orders: prev.orders.map(x => x.id === o.id ? o : x) }));
-  
   const calculateBalanceImpact = (t: Transaction): { custImpact: number, suppImpact: number } => {
     let custImpact = 0;
     let suppImpact = 0;
@@ -174,8 +133,6 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isLoading) return; 
-    
     setState(prev => {
         const newCustomers = prev.customers.map(c => {
             const balance = prev.transactions
@@ -183,30 +140,23 @@ const App: React.FC = () => {
                 .reduce((acc, t) => acc + calculateBalanceImpact(t).custImpact, 0);
             return { ...c, balanceUsd: balance };
         });
-
         const newSuppliers = prev.suppliers.map(s => {
             const balance = prev.transactions
                 .filter(t => t.supplierId === s.id)
                 .reduce((acc, t) => acc + calculateBalanceImpact(t).suppImpact, 0);
             return { ...s, balanceUsd: balance };
         });
-
         const custChanged = JSON.stringify(newCustomers) !== JSON.stringify(prev.customers);
         const suppChanged = JSON.stringify(newSuppliers) !== JSON.stringify(prev.suppliers);
-
         if (custChanged || suppChanged) {
             return { ...prev, customers: newCustomers, suppliers: newSuppliers };
         }
         return prev;
     });
-  }, [state.transactions, isLoading]); 
-
-  const addTransaction = (t: Transaction) => updateState(prev => ({ ...prev, transactions: [t, ...prev.transactions] }));
-  const updateTransaction = (updatedTx: Transaction) => updateState(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === updatedTx.id ? updatedTx : t) }));
-  const deleteTransaction = (id: string) => updateState(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
+  }, [state.transactions]);
 
   const processSale = (orderId: string, itemsToShip: { productId: string, qty: number }[], totalAmount: number) => {
-    updateState(prev => {
+    setState(prev => {
       const orderIndex = prev.orders.findIndex(o => o.id === orderId);
       if (orderIndex === -1) return prev;
       const order = prev.orders[orderIndex];
@@ -246,7 +196,7 @@ const App: React.FC = () => {
   };
 
   const processReturn = (customerId: string, productId: string, qty: number, price: number) => {
-      updateState(prev => {
+      setState(prev => {
           const updatedProducts = prev.products.map(p => p.id === productId ? { ...p, stok: p.stok + qty } : p);
            const newTransaction: Transaction = {
             id: `ret-${Date.now()}`,
@@ -264,32 +214,23 @@ const App: React.FC = () => {
       });
   };
 
-  // --- YÜKLENİYOR ---
   if (isLoading) {
-      return (
-          <div className="flex h-screen items-center justify-center bg-slate-100">
-              <div className="text-center">
-                  <Loader2 className="w-10 h-10 animate-spin text-blue-600 mx-auto mb-4"/>
-                  <p className="text-slate-600 font-medium">Veritabanına Bağlanıyor...</p>
-              </div>
-          </div>
-      );
+      return <div className="flex h-screen items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-blue-600"/></div>;
   }
 
-  // --- GİRİŞ KONTROLÜ ---
+  // --- LOGIN CHECK ---
   if (!state.currentUser) {
       return (
         <>
             <Auth onLogin={handleLogin} onRegister={handleRegister} users={state.users} t={t} />
             <div className="fixed top-4 right-4 flex gap-2 z-50">
-                <button onClick={() => setLanguage('TR')} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'TR' ? 'bg-blue-600 text-white shadow-md' : 'bg-white/80 text-slate-700 hover:bg-white'}`}>TR</button>
-                <button onClick={() => setLanguage('RU')} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'RU' ? 'bg-blue-600 text-white shadow-md' : 'bg-white/80 text-slate-700 hover:bg-white'}`}>RU</button>
+                <button onClick={() => setLanguage('TR')} className={`px-3 py-1 rounded text-xs font-bold ${language === 'TR' ? 'bg-blue-600 text-white' : 'bg-white'}`}>TR</button>
+                <button onClick={() => setLanguage('RU')} className={`px-3 py-1 rounded text-xs font-bold ${language === 'RU' ? 'bg-blue-600 text-white' : 'bg-white'}`}>RU</button>
             </div>
         </>
       );
   }
 
-  // --- ANA EKRAN ---
   const renderContent = () => {
     const props = { t, lang: language };
     switch (currentView) {
@@ -313,15 +254,13 @@ const App: React.FC = () => {
       <main className="flex-1 ml-64 p-8">
         <header className="mb-8 flex justify-between items-center">
             <div>
-                 <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
-                    {t(currentView.toLowerCase()) || currentView}
-                 </h2>
+                 <h2 className="text-3xl font-bold text-slate-800 tracking-tight">{t(currentView.toLowerCase()) || currentView}</h2>
                  <p className="text-slate-500 mt-1">Management Console</p>
             </div>
             <div className="flex items-center space-x-6">
                 <div className="flex bg-white rounded-lg shadow-sm border border-slate-200 p-1">
-                    <button onClick={() => setLanguage('TR')} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${language === 'TR' ? 'bg-red-50 text-red-600' : 'text-slate-500 hover:bg-slate-50'}`}>TR</button>
-                    <button onClick={() => setLanguage('RU')} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${language === 'RU' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>RU</button>
+                    <button onClick={() => setLanguage('TR')} className={`px-3 py-1 text-xs font-bold rounded ${language === 'TR' ? 'bg-red-50 text-red-600' : 'text-slate-500'}`}>TR</button>
+                    <button onClick={() => setLanguage('RU')} className={`px-3 py-1 text-xs font-bold rounded ${language === 'RU' ? 'bg-blue-50 text-blue-600' : 'text-slate-500'}`}>RU</button>
                 </div>
                 <div className="flex items-center space-x-3">
                     <div className="text-right hidden sm:block">
@@ -331,7 +270,7 @@ const App: React.FC = () => {
                     <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
                         {state.currentUser?.username.charAt(0).toUpperCase()}
                     </div>
-                    <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" title={t('logout')}>
+                    <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 rounded-full" title={t('logout')}>
                         <LogOut size={20}/>
                     </button>
                 </div>

@@ -4,7 +4,7 @@ export const initialUsers: User[] = [
   {
     id: 'u1',
     username: 'admin',
-    password: 'admin123', // In a real app, passwords should be hashed
+    password: 'admin123', 
     fullName: 'System Administrator',
     email: 'admin@bosfortekstil.com',
     role: 'admin',
@@ -43,7 +43,27 @@ export const initialProducts: Product[] = [
     satisFiyat: 12,
     imageUrl: 'https://picsum.photos/100/100?random=1'
   },
-  // ... Diğer ürünleriniz buraya eklenebilir
+  {
+    id: '2',
+    ean: '8684410010334',
+    artikul: '4050470000',
+    marka: 'VIENETTA',
+    markaKodu: '02',
+    modelAdi: 'KADIN ELBISE',
+    renk: 'HERBAL',
+    renkKodu: '05',
+    beden: 'M',
+    kumas: 'POLY/VIS',
+    kumasIcerik: '%63 POLY %33 VIS',
+    fotoKodu: '4050470000_02_05',
+    cinsiyet: 'Kadın',
+    kategori: 'Elbise',
+    stok: 80,
+    maliyetFiyat: 6.5,
+    fabrikaFiyat: 8,
+    satisFiyat: 18,
+    imageUrl: 'https://picsum.photos/100/100?random=2'
+  }
 ];
 
 export const initialCustomers: Customer[] = [
@@ -60,6 +80,19 @@ export const initialCustomers: Customer[] = [
     cargoCustNo: 'AK-452',
     balanceUsd: 1000 
   },
+  { 
+    id: 'c2', 
+    name: 'Elena Petrova', 
+    company: 'Moda Moscow', 
+    phone: '+7 911 222 33 44',
+    email: 'info@modamoscow.ru',
+    country: 'Russia',
+    city: 'St. Petersburg',
+    address: 'Nevsky Prospect 14',
+    cargoCompany: 'Lider Kargo',
+    cargoCustNo: '9902',
+    balanceUsd: -50 
+  }
 ];
 
 export const initialSuppliers: Supplier[] = [

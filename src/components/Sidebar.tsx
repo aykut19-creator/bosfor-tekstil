@@ -35,7 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onL
     { id: 'REPORTS', label: t('reports'), icon: BarChart3 },
   ];
 
-  // Sadece Adminler görebilir
+  // Only show User Management for Admins
   if (currentUser?.role === 'admin') {
     menuItems.push({ id: 'USERS', label: t('userManagement'), icon: Shield });
   }
@@ -91,6 +91,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onL
             <LogOut size={20} className="mr-3"/>
             <span className="font-medium">{t('logout')}</span>
         </button>
+        <div className="mt-4 text-center text-xs text-slate-600">
+            v1.3.0 (Auth)
+        </div>
       </div>
     </aside>
   );

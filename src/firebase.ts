@@ -1,8 +1,7 @@
-// src/firebase.ts
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// BURAYA KENDİ FIREBASE BİLGİLERİNİZİ YAPIŞTIRIN
+// BURAYI KONTROL EDİN: Bu bilgiler sizin Firebase projenize ait olmalı.
 const firebaseConfig = {
   apiKey: "AIzaSyDyzqGDcTVJU1HIPRQO8KKRh-dQZDZskzM",
   authDomain: "bosfor-tekstil-79352.firebaseapp.com",
@@ -12,5 +11,6 @@ const firebaseConfig = {
   appId: "1:906908262702:web:37803b23210fdaf5131abf"
 };
 
+// Firebase başlatma
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
