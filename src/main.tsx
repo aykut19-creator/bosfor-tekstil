@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css'; 
 
-// Hata Yakalayıcı (Beyaz Ekranı Önlemek İçin)
+// Hata Yakalayıcı
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
   constructor(props: any) {
     super(props);
@@ -15,32 +15,17 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error("CRITICAL APP ERROR:", error, errorInfo);
+    console.error("Uygulama Çöktü:", error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'sans-serif' }}>
-          <h1 style={{ color: '#ef4444' }}>Uygulama Başlatılamadı</h1>
-          <p>Hata Detayı:</p>
-          <pre style={{ background: '#f1f5f9', padding: '15px', borderRadius: '5px', overflow: 'auto', textAlign: 'left' }}>
-            {this.state.error?.toString()}
-          </pre>
-          <button 
-            onClick={() => { localStorage.clear(); window.location.reload(); }} 
-            style={{
-              marginTop: '20px',
-              padding: '10px 20px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            Verileri Temizle ve Yeniden Başlat
-          </button>
+        <div style={{ padding: 40, textAlign: 'center' }}>
+          <h1 style={{ color: 'red' }}>Beklenmeyen bir hata oluştu.</h1>
+          <p>Lütfen sayfayı yenileyin.</p>
+          <pre style={{ textAlign: 'left', background: '#eee', padding: 10, marginTop: 10 }}>{this.state.error?.toString()}</pre>
+          <button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: '10px 20px' }}>Yenile</button>
         </div>
       );
     }
@@ -53,8 +38,7 @@ if (!rootElement) {
   throw new Error("Root element not found");
 }
 
-const root = ReactDOM.createRoot(rootElement);
-root.render(
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ErrorBoundary>
       <App />

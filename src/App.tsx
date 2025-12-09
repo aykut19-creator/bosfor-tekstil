@@ -3,6 +3,8 @@ import { Sidebar } from './components/Sidebar';
 import { View, AppState, Product, Customer, Order, Transaction, OrderStatus, Currency, Supplier, Language, User } from './types';
 import { initialProducts, initialCustomers, initialOrders, initialTransactions, initialSuppliers, initialUsers } from './services/mockData';
 import { dictionary } from './services/translations';
+import { db } from './firebase'; 
+import { doc, setDoc, onSnapshot } from "firebase/firestore"; 
 
 // Pages
 import { Dashboard } from './components/pages/Dashboard';
@@ -17,63 +19,111 @@ import { ReportsView } from './components/pages/ReportsView';
 import { UserManagementView } from './components/pages/UserManagementView';
 import { AIChat } from './components/AIChat';
 import { Auth } from './components/Auth';
-import { LogOut, Loader2 } from 'lucide-react'; 
+import { LogOut, Loader2, Database } from 'lucide-react'; 
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [language, setLanguage] = useState<Language>('TR');
   const [isLoading, setIsLoading] = useState(true);
+  const [dbStatus, setDbStatus] = useState<string>('Bağlanıyor...');
   
   const t = (key: string) => dictionary[language][key] || key;
 
-  // --- LOCAL STORAGE STATE MANAGEMENT ---
-  const [state, setState] = useState<AppState>(() => {
-    try {
-      const saved = localStorage.getItem('bosfor_erp_v5_local');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return { ...parsed, currentUser: null };
-      }
-    } catch (e) {
-      console.error("Load Error:", e);
-    }
-    return {
-      users: initialUsers,
-      currentUser: null, 
-      products: initialProducts,
-      customers: initialCustomers,
-      suppliers: initialSuppliers,
-      orders: initialOrders,
-      transactions: initialTransactions,
-    };
+  // Başlangıç State'i
+  const [state, setState] = useState<AppState>({
+    users: [],
+    currentUser: null, 
+    products: [],
+    customers: [],
+    suppliers: [],
+    orders: [],
+    transactions: [],
   });
 
+  // --- FIREBASE VERİ SENKRONİZASYONU ---
   useEffect(() => {
-    setIsLoading(false);
-    try {
-      localStorage.setItem('bosfor_erp_v5_local', JSON.stringify(state));
-    } catch (e) {
-      console.error("Save Error:", e);
-    }
-  }, [state]);
+    // Veritabanındaki 'main_state' dokümanını dinle
+    const unsubscribe = onSnapshot(doc(db, "erp_data", "main_state"), (docSnapshot) => {
+        if (docSnapshot.exists()) {
+            console.log("Veri Firebase'den yüklendi.");
+            const data = docSnapshot.data() as AppState;
+            
+            // Veriyi yükle ama mevcut oturumu koru (currentUser local kalmalı)
+            setState(prev => ({
+                ...data,
+                currentUser: prev.currentUser 
+            }));
+            setDbStatus('Bağlı');
+        } else {
+            console.log("Veritabanı boş, ilk kurulum yapılıyor...");
+            // Eğer veritabanı boşsa, mockData ile doldur
+            const initialState = {
+                users: initialUsers,
+                currentUser: null,
+                products: initialProducts,
+                customers: initialCustomers,
+                suppliers: initialSuppliers,
+                orders: initialOrders,
+                transactions: initialTransactions,
+            };
+            // Firebase'e yaz
+            setDoc(doc(db, "erp_data", "main_state"), initialState)
+              .then(() => console.log("İlk veriler yazıldı."))
+              .catch(e => console.error("İlk yazma hatası:", e));
+            
+            setState(initialState);
+            setDbStatus('Yeni Kurulum');
+        }
+        setIsLoading(false);
+    }, (error) => {
+        console.error("Firebase Bağlantı Hatası:", error);
+        setDbStatus('Hata: ' + error.message);
+        alert("Veritabanına bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.");
+        setIsLoading(false);
+    });
 
-  // --- AUTH ---
+    return () => unsubscribe();
+  }, []);
+
+  // --- VERİ KAYDETME FONKSİYONU ---
+  // State'i güncelleyen ve aynı anda Firebase'e gönderen yardımcı fonksiyon
+  const updateState = (updater: (prev: AppState) => AppState) => {
+      setState(prev => {
+          const newState = updater(prev);
+          
+          // Firebase'e kaydet (currentUser hariç)
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { currentUser, ...dataToSave } = newState;
+          
+          setDoc(doc(db, "erp_data", "main_state"), dataToSave, { merge: true })
+            .catch(e => console.error("Kayıt hatası:", e));
+
+          return newState;
+      });
+  };
+
+  // --- AUTH İŞLEMLERİ ---
   const handleLogin = (user: User) => {
+      console.log("Giriş yapıldı:", user.username);
       setState(prev => ({ ...prev, currentUser: user }));
   };
 
   const handleRegister = (newUser: Omit<User, 'id' | 'status'>) => {
+      // Eğer sistemde hiç kullanıcı yoksa ilk kullanıcıyı Admin yap
       const isFirstUser = state.users.length === 0;
+      
       const user: User = {
           ...newUser,
           id: `u-${Date.now()}`,
           status: isFirstUser ? 'active' : 'pending',
           role: isFirstUser ? 'admin' : 'user'
       };
-      setState(prev => ({ ...prev, users: [...prev.users, user] }));
+      
+      // Firebase'e kaydet
+      updateState(prev => ({ ...prev, users: [...prev.users, user] }));
       
       if (isFirstUser) {
-          alert("İlk kullanıcı olduğunuz için YÖNETİCİ olarak kaydedildiniz.");
+          alert("Sistemin ilk kullanıcısı olduğunuz için YÖNETİCİ yetkisiyle kaydedildiniz.");
       } else {
           alert(t('registerSuccess'));
       }
@@ -84,25 +134,35 @@ const App: React.FC = () => {
       setCurrentView('DASHBOARD');
   };
 
+  // Admin İşlemleri
   const handleApproveUser = (id: string) => {
-      setState(prev => ({
+      updateState(prev => ({
           ...prev,
           users: prev.users.map(u => u.id === id ? { ...u, status: 'active' } : u)
       }));
   };
 
   const handleRejectUser = (id: string) => {
-      setState(prev => ({
+      updateState(prev => ({
           ...prev,
           users: prev.users.filter(u => u.id !== id)
       }));
   };
 
-  // --- DATA HELPERS ---
-  const addProduct = (p: Product) => setState(prev => ({ ...prev, products: [...prev.products, p] }));
-  const updateProduct = (p: Product) => setState(prev => ({ ...prev, products: prev.products.map(x => x.id === p.id ? p : x) }));
-  const addCustomer = (c: Customer) => setState(prev => ({ ...prev, customers: [...prev.customers, c] }));
-  const updateCustomer = (c: Customer) => setState(prev => ({ ...prev, customers: prev.customers.map(x => x.id === c.id ? c : x) }));
+  const handleUpdateRole = (id: string, role: any) => {
+      updateState(prev => ({
+          ...prev,
+          users: prev.users.map(u => u.id === id ? { ...u, role: role } : u)
+      }));
+  };
+
+  // --- DATA İŞLEMLERİ ---
+  const addProduct = (p: Product) => updateState(prev => ({ ...prev, products: [...prev.products, p] }));
+  const updateProduct = (p: Product) => updateState(prev => ({ ...prev, products: prev.products.map(x => x.id === p.id ? p : x) }));
+  
+  const addCustomer = (c: Customer) => updateState(prev => ({ ...prev, customers: [...prev.customers, c] }));
+  const updateCustomer = (c: Customer) => updateState(prev => ({ ...prev, customers: prev.customers.map(x => x.id === c.id ? c : x) }));
+  
   const deleteCustomer = (id: string) => {
       const hasOrders = state.orders.some(o => o.customerId === id);
       const hasTransactions = state.transactions.some(t => t.customerId === id);
@@ -110,14 +170,15 @@ const App: React.FC = () => {
           alert(t('cannotDeleteCustomer'));
           return;
       }
-      setState(prev => ({ ...prev, customers: prev.customers.filter(c => c.id !== id) }));
+      updateState(prev => ({ ...prev, customers: prev.customers.filter(c => c.id !== id) }));
   };
-  const addSupplier = (s: Supplier) => setState(prev => ({ ...prev, suppliers: [...prev.suppliers, s] }));
-  const addOrder = (o: Order) => setState(prev => ({ ...prev, orders: [...prev.orders, o] }));
-  const updateOrder = (o: Order) => setState(prev => ({ ...prev, orders: prev.orders.map(x => x.id === o.id ? o : x) }));
-  const addTransaction = (t: Transaction) => setState(prev => ({ ...prev, transactions: [t, ...prev.transactions] }));
-  const updateTransaction = (updatedTx: Transaction) => setState(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === updatedTx.id ? updatedTx : t) }));
-  const deleteTransaction = (id: string) => setState(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
+
+  const addSupplier = (s: Supplier) => updateState(prev => ({ ...prev, suppliers: [...prev.suppliers, s] }));
+  const addOrder = (o: Order) => updateState(prev => ({ ...prev, orders: [...prev.orders, o] }));
+  const updateOrder = (o: Order) => updateState(prev => ({ ...prev, orders: prev.orders.map(x => x.id === o.id ? o : x) }));
+  const addTransaction = (t: Transaction) => updateState(prev => ({ ...prev, transactions: [t, ...prev.transactions] }));
+  const updateTransaction = (updatedTx: Transaction) => updateState(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === updatedTx.id ? updatedTx : t) }));
+  const deleteTransaction = (id: string) => updateState(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
 
   const calculateBalanceImpact = (t: Transaction): { custImpact: number, suppImpact: number } => {
     let custImpact = 0;
@@ -132,7 +193,9 @@ const App: React.FC = () => {
     return { custImpact, suppImpact };
   };
 
+  // Bakiyeleri hesapla (Bunu sadece local state'te tutuyoruz, veritabanına geri yazmaya gerek yok, performans için)
   useEffect(() => {
+    if (isLoading) return; 
     setState(prev => {
         const newCustomers = prev.customers.map(c => {
             const balance = prev.transactions
@@ -146,17 +209,19 @@ const App: React.FC = () => {
                 .reduce((acc, t) => acc + calculateBalanceImpact(t).suppImpact, 0);
             return { ...s, balanceUsd: balance };
         });
+        
         const custChanged = JSON.stringify(newCustomers) !== JSON.stringify(prev.customers);
         const suppChanged = JSON.stringify(newSuppliers) !== JSON.stringify(prev.suppliers);
+
         if (custChanged || suppChanged) {
             return { ...prev, customers: newCustomers, suppliers: newSuppliers };
         }
         return prev;
     });
-  }, [state.transactions]);
+  }, [state.transactions, isLoading]); 
 
   const processSale = (orderId: string, itemsToShip: { productId: string, qty: number }[], totalAmount: number) => {
-    setState(prev => {
+    updateState(prev => {
       const orderIndex = prev.orders.findIndex(o => o.id === orderId);
       if (orderIndex === -1) return prev;
       const order = prev.orders[orderIndex];
@@ -196,7 +261,7 @@ const App: React.FC = () => {
   };
 
   const processReturn = (customerId: string, productId: string, qty: number, price: number) => {
-      setState(prev => {
+      updateState(prev => {
           const updatedProducts = prev.products.map(p => p.id === productId ? { ...p, stok: p.stok + qty } : p);
            const newTransaction: Transaction = {
             id: `ret-${Date.now()}`,
@@ -214,18 +279,29 @@ const App: React.FC = () => {
       });
   };
 
+  // --- YÜKLENİYOR ---
   if (isLoading) {
-      return <div className="flex h-screen items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-blue-600"/></div>;
+      return (
+          <div className="flex h-screen items-center justify-center bg-slate-100 flex-col">
+              <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-4"/>
+              <p className="text-slate-600 font-bold">BOSFOR ERP</p>
+              <p className="text-slate-400 text-sm mt-2">Veritabanına bağlanılıyor...</p>
+          </div>
+      );
   }
 
-  // --- LOGIN CHECK ---
+  // --- GİRİŞ KONTROLÜ ---
   if (!state.currentUser) {
       return (
         <>
             <Auth onLogin={handleLogin} onRegister={handleRegister} users={state.users} t={t} />
             <div className="fixed top-4 right-4 flex gap-2 z-50">
-                <button onClick={() => setLanguage('TR')} className={`px-3 py-1 rounded text-xs font-bold ${language === 'TR' ? 'bg-blue-600 text-white' : 'bg-white'}`}>TR</button>
-                <button onClick={() => setLanguage('RU')} className={`px-3 py-1 rounded text-xs font-bold ${language === 'RU' ? 'bg-blue-600 text-white' : 'bg-white'}`}>RU</button>
+                <button onClick={() => setLanguage('TR')} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'TR' ? 'bg-blue-600 text-white shadow-md' : 'bg-white/80 text-slate-700 hover:bg-white'}`}>TR</button>
+                <button onClick={() => setLanguage('RU')} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'RU' ? 'bg-blue-600 text-white shadow-md' : 'bg-white/80 text-slate-700 hover:bg-white'}`}>RU</button>
+            </div>
+            {/* Bağlantı Durumu Göstergesi */}
+            <div className="fixed bottom-4 left-4 text-xs text-slate-400 bg-white/80 p-2 rounded shadow flex items-center">
+                <Database size={14} className="mr-2"/> Durum: {dbStatus}
             </div>
         </>
       );
@@ -243,7 +319,7 @@ const App: React.FC = () => {
       case 'PURCHASE': return <PurchaseView state={state} onProcessReturn={processReturn} {...props} />;
       case 'EXPENSES': return <ExpensesView state={state} onAddSupplier={addSupplier} onAddTransaction={addTransaction} onUpdateTransaction={updateTransaction} onDeleteTransaction={deleteTransaction} {...props} />;
       case 'REPORTS': return <ReportsView state={state} {...props} />;
-      case 'USERS': return <UserManagementView users={state.users} onApprove={handleApproveUser} onReject={handleRejectUser} t={t} />;
+      case 'USERS': return <UserManagementView users={state.users} onApprove={handleApproveUser} onReject={handleRejectUser} onUpdateRole={handleUpdateRole} t={t} />;
       default: return <Dashboard state={state} {...props} />;
     }
   };
@@ -254,13 +330,15 @@ const App: React.FC = () => {
       <main className="flex-1 ml-64 p-8">
         <header className="mb-8 flex justify-between items-center">
             <div>
-                 <h2 className="text-3xl font-bold text-slate-800 tracking-tight">{t(currentView.toLowerCase()) || currentView}</h2>
+                 <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
+                    {t(currentView.toLowerCase()) || currentView}
+                 </h2>
                  <p className="text-slate-500 mt-1">Management Console</p>
             </div>
             <div className="flex items-center space-x-6">
                 <div className="flex bg-white rounded-lg shadow-sm border border-slate-200 p-1">
-                    <button onClick={() => setLanguage('TR')} className={`px-3 py-1 text-xs font-bold rounded ${language === 'TR' ? 'bg-red-50 text-red-600' : 'text-slate-500'}`}>TR</button>
-                    <button onClick={() => setLanguage('RU')} className={`px-3 py-1 text-xs font-bold rounded ${language === 'RU' ? 'bg-blue-50 text-blue-600' : 'text-slate-500'}`}>RU</button>
+                    <button onClick={() => setLanguage('TR')} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${language === 'TR' ? 'bg-red-50 text-red-600' : 'text-slate-500 hover:bg-slate-50'}`}>TR</button>
+                    <button onClick={() => setLanguage('RU')} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${language === 'RU' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>RU</button>
                 </div>
                 <div className="flex items-center space-x-3">
                     <div className="text-right hidden sm:block">
@@ -270,7 +348,7 @@ const App: React.FC = () => {
                     <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
                         {state.currentUser?.username.charAt(0).toUpperCase()}
                     </div>
-                    <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 rounded-full" title={t('logout')}>
+                    <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" title={t('logout')}>
                         <LogOut size={20}/>
                     </button>
                 </div>
