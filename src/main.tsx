@@ -23,20 +23,20 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
       return (
         <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'sans-serif' }}>
           <h1 style={{ color: '#ef4444' }}>Uygulama Başlatılamadı</h1>
-          <p>Bir hata oluştu. Lütfen verileri temizleyip tekrar deneyin.</p>
-          <pre style={{ background: '#f1f5f9', padding: '15px', borderRadius: '5px', overflow: 'auto', textAlign: 'left', margin: '20px 0' }}>
+          <p>Hata Detayı:</p>
+          <pre style={{ background: '#f1f5f9', padding: '15px', borderRadius: '5px', overflow: 'auto', textAlign: 'left' }}>
             {this.state.error?.toString()}
           </pre>
           <button 
             onClick={() => { localStorage.clear(); window.location.reload(); }} 
             style={{
+              marginTop: '20px',
               padding: '10px 20px',
               backgroundColor: '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px'
+              cursor: 'pointer'
             }}
           >
             Verileri Temizle ve Yeniden Başlat
