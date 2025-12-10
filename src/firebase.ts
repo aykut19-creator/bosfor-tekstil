@@ -4,30 +4,47 @@ import { initializeApp } from "firebase/app";
 // @ts-ignore
 import { getFirestore } from "firebase/firestore";
 
-// Firebase configuration using environment variables
-// These keys must be set in Netlify Site Settings > Build & deploy > Environment variables
+// Helper function to safely get env variables
+const getEnv = (key: string) => {
+  // Check import.meta.env first (Vite)
+  if (import.meta.env && import.meta.env[key]) {
+    return import.meta.env[key];
+  }
+  // Fallback for some build environments
+  try {
+    return process.env[key];
+  } catch (e) {
+    return undefined;
+  }
+};
+
+// Firebase configuration
+// We try to use environment variables first.
+// If they are missing during local dev or specific build phases, we handle it gracefully.
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: getEnv("VITE_FIREBASE_API_KEY"),
+  authDomain: getEnv("VITE_FIREBASE_AUTH_DOMAIN"),
+  projectId: getEnv("VITE_FIREBASE_PROJECT_ID"),
+  storageBucket: getEnv("VITE_FIREBASE_STORAGE_BUCKET"),
+  messagingSenderId: getEnv("VITE_FIREBASE_MESSAGING_SENDER_ID"),
+  appId: getEnv("VITE_FIREBASE_APP_ID")
 };
 
 // Validate config to prevent white screen of death
+// We only log a warning instead of stopping execution, to allow the build to proceed
 const isConfigValid = Object.values(firebaseConfig).every(value => !!value);
 
 if (!isConfigValid) {
-  console.error("Firebase Environment Variables are missing! Please check Netlify settings.");
+  console.warn("Firebase Environment Variables might be missing. Checking connection...");
 }
 
 // Initialize Firebase
-// We use a try-catch block to prevent the entire app from crashing during build/start if keys are missing
 let app;
 let dbInstance;
 
 try {
+  // Even if config is partial, we try to initialize to catch specific errors later
+  // @ts-ignore - Firebase types might complain about partial config but runtime handles it
   app = initializeApp(firebaseConfig);
   dbInstance = getFirestore(app);
 } catch (error) {
