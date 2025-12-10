@@ -19,13 +19,14 @@ import { ReportsView } from './components/pages/ReportsView';
 import { UserManagementView } from './components/pages/UserManagementView';
 import { AIChat } from './components/AIChat';
 import { Auth } from './components/Auth';
-import { LogOut, Loader2, Database } from 'lucide-react'; 
+import { LogOut, Loader2, Database, WifiOff } from 'lucide-react'; 
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [language, setLanguage] = useState<Language>('TR');
   const [isLoading, setIsLoading] = useState(true);
   const [dbStatus, setDbStatus] = useState<string>('Bağlanıyor...');
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   
   const t = (key: string) => dictionary[language][key] || key;
 
@@ -53,7 +54,8 @@ const App: React.FC = () => {
                 ...data,
                 currentUser: prev.currentUser 
             }));
-            setDbStatus('Bağlı');
+            setDbStatus('Bağlı (Online)');
+            setIsOfflineMode(false);
         } else {
             console.log("Veritabanı boş, ilk kurulum yapılıyor...");
             // Eğer veritabanı boşsa, mockData ile doldur
@@ -77,8 +79,27 @@ const App: React.FC = () => {
         setIsLoading(false);
     }, (error) => {
         console.error("Firebase Bağlantı Hatası:", error);
-        setDbStatus('Hata: ' + error.message);
-        alert("Veritabanına bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.");
+        
+        // HATA DURUMUNDA MOCK VERİ İLE DEVAM ET (FALLBACK)
+        console.warn("Firebase'e erişilemedi, çevrimdışı moda geçiliyor.");
+        
+        const fallbackState = {
+            users: initialUsers,
+            currentUser: null,
+            products: initialProducts,
+            customers: initialCustomers,
+            suppliers: initialSuppliers,
+            orders: initialOrders,
+            transactions: initialTransactions,
+        };
+
+        setState(prev => ({
+            ...fallbackState,
+            currentUser: prev.currentUser
+        }));
+        
+        setDbStatus('Çevrimdışı / Demo Modu');
+        setIsOfflineMode(true);
         setIsLoading(false);
     });
 
@@ -92,11 +113,14 @@ const App: React.FC = () => {
           const newState = updater(prev);
           
           // Firebase'e kaydet (currentUser hariç)
+          // Eğer offline moddaysak sadece local state güncellenir, firebase hatası yutulur.
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { currentUser, ...dataToSave } = newState;
           
-          setDoc(doc(db, "erp_data", "main_state"), dataToSave, { merge: true })
-            .catch(e => console.error("Kayıt hatası:", e));
+          if (!isOfflineMode) {
+            setDoc(doc(db, "erp_data", "main_state"), dataToSave, { merge: true })
+                .catch(e => console.error("Kayıt hatası:", e));
+          }
 
           return newState;
       });
@@ -193,7 +217,7 @@ const App: React.FC = () => {
     return { custImpact, suppImpact };
   };
 
-  // Bakiyeleri hesapla (Bunu sadece local state'te tutuyoruz, veritabanına geri yazmaya gerek yok, performans için)
+  // Bakiyeleri hesapla
   useEffect(() => {
     if (isLoading) return; 
     setState(prev => {
@@ -300,8 +324,9 @@ const App: React.FC = () => {
                 <button onClick={() => setLanguage('RU')} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'RU' ? 'bg-blue-600 text-white shadow-md' : 'bg-white/80 text-slate-700 hover:bg-white'}`}>RU</button>
             </div>
             {/* Bağlantı Durumu Göstergesi */}
-            <div className="fixed bottom-4 left-4 text-xs text-slate-400 bg-white/80 p-2 rounded shadow flex items-center">
-                <Database size={14} className="mr-2"/> Durum: {dbStatus}
+            <div className={`fixed bottom-4 left-4 text-xs p-2 rounded shadow flex items-center transition-colors ${isOfflineMode ? 'bg-orange-100 text-orange-700' : 'bg-white/80 text-slate-400'}`}>
+                {isOfflineMode ? <WifiOff size={14} className="mr-2"/> : <Database size={14} className="mr-2"/>}
+                Durum: {dbStatus}
             </div>
         </>
       );
@@ -333,7 +358,7 @@ const App: React.FC = () => {
                  <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
                     {t(currentView.toLowerCase()) || currentView}
                  </h2>
-                 <p className="text-slate-500 mt-1">Management Console</p>
+                 <p className="text-slate-500 mt-1">Management Console {isOfflineMode && <span className="text-orange-600 font-bold ml-2">(Çevrimdışı Mod)</span>}</p>
             </div>
             <div className="flex items-center space-x-6">
                 <div className="flex bg-white rounded-lg shadow-sm border border-slate-200 p-1">

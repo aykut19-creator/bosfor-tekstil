@@ -6,10 +6,11 @@ interface Props {
   users: User[];
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onUpdateRole: (id: string, role: any) => void;
   t: (key: string) => string;
 }
 
-export const UserManagementView: React.FC<Props> = ({ users, onApprove, onReject, t }) => {
+export const UserManagementView: React.FC<Props> = ({ users, onApprove, onReject, onUpdateRole, t }) => {
   const pendingUsers = users.filter(u => u.status === 'pending');
   const activeUsers = users.filter(u => u.status === 'active');
 
