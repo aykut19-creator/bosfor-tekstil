@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { View, AppState, Product, Customer, Order, Transaction, OrderStatus, Currency, Supplier, Language, User } from './types';
@@ -19,14 +20,14 @@ import { ReportsView } from './components/pages/ReportsView';
 import { UserManagementView } from './components/pages/UserManagementView';
 import { AIChat } from './components/AIChat';
 import { Auth } from './components/Auth';
-import { LogOut, Loader2, Database, WifiOff } from 'lucide-react'; 
+import { LogOut, Loader2, Database, Wifi, AlertTriangle } from 'lucide-react'; 
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [language, setLanguage] = useState<Language>('TR');
   const [isLoading, setIsLoading] = useState(true);
-  const [dbStatus, setDbStatus] = useState<string>('Bağlanıyor...');
-  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [dbStatus, setDbStatus] = useState<string>('Sunucuya Bağlanıyor...');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   
   const t = (key: string) => dictionary[language][key] || key;
 
@@ -42,23 +43,27 @@ const App: React.FC = () => {
   });
 
   // --- FIREBASE VERİ SENKRONİZASYONU ---
+  // Bu bölüm programın kalbidir. Veritabanındaki değişiklikleri anlık olarak çeker.
   useEffect(() => {
-    // Veritabanındaki 'main_state' dokümanını dinle
+    setDbStatus('Veri Senkronizasyonu Başlatılıyor...');
+    
     const unsubscribe = onSnapshot(doc(db, "erp_data", "main_state"), (docSnapshot) => {
         if (docSnapshot.exists()) {
-            console.log("Veri Firebase'den yüklendi.");
+            console.log("Güncel veri sunucudan alındı.");
             const data = docSnapshot.data() as AppState;
             
-            // Veriyi yükle ama mevcut oturumu koru (currentUser local kalmalı)
+            // Veriyi state'e yükle (Mevcut oturumu koruyarak)
             setState(prev => ({
                 ...data,
-                currentUser: prev.currentUser 
+                currentUser: prev.currentUser // Oturum bilgisini local state'den koru
             }));
-            setDbStatus('Bağlı (Online)');
-            setIsOfflineMode(false);
+            
+            setDbStatus('Online (Canlı Bağlantı)');
+            setConnectionError(null);
+            setIsLoading(false);
         } else {
-            console.log("Veritabanı boş, ilk kurulum yapılıyor...");
-            // Eğer veritabanı boşsa, mockData ile doldur
+            console.log("Veritabanı boş, ilk kurulum başlatılıyor...");
+            // Eğer veritabanı tamamen boşsa, başlangıç verilerini yükle
             const initialState = {
                 users: initialUsers,
                 currentUser: null,
@@ -68,38 +73,31 @@ const App: React.FC = () => {
                 orders: initialOrders,
                 transactions: initialTransactions,
             };
-            // Firebase'e yaz
-            setDoc(doc(db, "erp_data", "main_state"), initialState)
-              .then(() => console.log("İlk veriler yazıldı."))
-              .catch(e => console.error("İlk yazma hatası:", e));
             
+            // İlk veriyi Firebase'e yaz
+            setDoc(doc(db, "erp_data", "main_state"), initialState)
+              .then(() => {
+                  console.log("İlk veriler veritabanına yazıldı.");
+                  setDbStatus('Kurulum Tamamlandı');
+              })
+              .catch(e => {
+                  console.error("Yazma Hatası:", e);
+                  setConnectionError("Veri yazılamadı. Lütfen Firebase Kurallarını kontrol edin.");
+              });
+            
+            // UI'ı güncelle
             setState(initialState);
-            setDbStatus('Yeni Kurulum');
+            setIsLoading(false);
         }
-        setIsLoading(false);
     }, (error) => {
         console.error("Firebase Bağlantı Hatası:", error);
-        
-        // HATA DURUMUNDA MOCK VERİ İLE DEVAM ET (FALLBACK)
-        console.warn("Firebase'e erişilemedi, çevrimdışı moda geçiliyor.");
-        
-        const fallbackState = {
-            users: initialUsers,
-            currentUser: null,
-            products: initialProducts,
-            customers: initialCustomers,
-            suppliers: initialSuppliers,
-            orders: initialOrders,
-            transactions: initialTransactions,
-        };
-
-        setState(prev => ({
-            ...fallbackState,
-            currentUser: prev.currentUser
-        }));
-        
-        setDbStatus('Çevrimdışı / Demo Modu');
-        setIsOfflineMode(true);
+        // Hata durumunda kullanıcıyı bilgilendir
+        if (error.code === 'permission-denied') {
+             setConnectionError("Erişim Reddedildi! Firebase Kurallarını 'allow read, write: if true;' yapmalısınız.");
+        } else {
+             setConnectionError(`Bağlantı Hatası: ${error.message}`);
+        }
+        setDbStatus('Bağlantı Koptu');
         setIsLoading(false);
     });
 
@@ -107,20 +105,24 @@ const App: React.FC = () => {
   }, []);
 
   // --- VERİ KAYDETME FONKSİYONU ---
-  // State'i güncelleyen ve aynı anda Firebase'e gönderen yardımcı fonksiyon
+  // State'i güncelleyen ve Firebase'e gönderen merkezi fonksiyon
   const updateState = (updater: (prev: AppState) => AppState) => {
       setState(prev => {
           const newState = updater(prev);
           
-          // Firebase'e kaydet (currentUser hariç)
-          // Eğer offline moddaysak sadece local state güncellenir, firebase hatası yutulur.
+          // Oturum bilgisi hariç tüm veriyi veritabanına gönder
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { currentUser, ...dataToSave } = newState;
           
-          if (!isOfflineMode) {
-            setDoc(doc(db, "erp_data", "main_state"), dataToSave, { merge: true })
-                .catch(e => console.error("Kayıt hatası:", e));
-          }
+          setDbStatus('Kaydediliyor...');
+          
+          setDoc(doc(db, "erp_data", "main_state"), dataToSave, { merge: true })
+            .then(() => setDbStatus('Online (Senkronize)'))
+            .catch(e => {
+                console.error("Kayıt hatası:", e);
+                setDbStatus('Kayıt Hatası!');
+                alert("Veri kaydedilemedi! İnternet bağlantınızı veya yetkilerinizi kontrol edin.");
+            });
 
           return newState;
       });
@@ -143,7 +145,7 @@ const App: React.FC = () => {
           role: isFirstUser ? 'admin' : 'user'
       };
       
-      // Firebase'e kaydet
+      // Veritabanına kaydet
       updateState(prev => ({ ...prev, users: [...prev.users, user] }));
       
       if (isFirstUser) {
@@ -180,7 +182,7 @@ const App: React.FC = () => {
       }));
   };
 
-  // --- DATA İŞLEMLERİ ---
+  // --- DATA İŞLEMLERİ (CRUD) ---
   const addProduct = (p: Product) => updateState(prev => ({ ...prev, products: [...prev.products, p] }));
   const updateProduct = (p: Product) => updateState(prev => ({ ...prev, products: prev.products.map(x => x.id === p.id ? p : x) }));
   
@@ -204,22 +206,25 @@ const App: React.FC = () => {
   const updateTransaction = (updatedTx: Transaction) => updateState(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === updatedTx.id ? updatedTx : t) }));
   const deleteTransaction = (id: string) => updateState(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
 
-  const calculateBalanceImpact = (t: Transaction): { custImpact: number, suppImpact: number } => {
-    let custImpact = 0;
-    let suppImpact = 0;
-    if (t.customerId) {
-        if (t.type === 'INCOME') custImpact = t.amountUsd; 
-        if (t.type === 'COLLECTION' || t.type === 'EXPENSE') custImpact = -t.amountUsd; 
-    } else if (t.supplierId) {
-        if (t.type === 'EXPENSE') suppImpact = t.amountUsd;
-        if (t.type === 'PAYMENT' || t.type === 'COLLECTION') suppImpact = -t.amountUsd; 
-    }
-    return { custImpact, suppImpact };
-  };
-
-  // Bakiyeleri hesapla
+  // Bakiyeleri dinamik hesapla (Veritabanından gelen işlem geçmişine göre)
   useEffect(() => {
     if (isLoading) return; 
+    
+    // İşlemlerden bakiye hesapla
+    const calculateBalanceImpact = (t: Transaction): { custImpact: number, suppImpact: number } => {
+        let custImpact = 0;
+        let suppImpact = 0;
+        if (t.customerId) {
+            if (t.type === 'INCOME') custImpact = t.amountUsd; 
+            if (t.type === 'COLLECTION' || t.type === 'EXPENSE') custImpact = -t.amountUsd; 
+        } else if (t.supplierId) {
+            if (t.type === 'EXPENSE') suppImpact = t.amountUsd;
+            if (t.type === 'PAYMENT' || t.type === 'COLLECTION') suppImpact = -t.amountUsd; 
+        }
+        return { custImpact, suppImpact };
+    };
+
+    // Bu işlem local state'i günceller ancak DB'ye yazmaz (DB'de transactions esastır)
     setState(prev => {
         const newCustomers = prev.customers.map(c => {
             const balance = prev.transactions
@@ -234,10 +239,8 @@ const App: React.FC = () => {
             return { ...s, balanceUsd: balance };
         });
         
-        const custChanged = JSON.stringify(newCustomers) !== JSON.stringify(prev.customers);
-        const suppChanged = JSON.stringify(newSuppliers) !== JSON.stringify(prev.suppliers);
-
-        if (custChanged || suppChanged) {
+        // Sadece değişiklik varsa güncelle (Render döngüsünü engellemek için)
+        if (JSON.stringify(newCustomers) !== JSON.stringify(prev.customers) || JSON.stringify(newSuppliers) !== JSON.stringify(prev.suppliers)) {
             return { ...prev, customers: newCustomers, suppliers: newSuppliers };
         }
         return prev;
@@ -303,13 +306,50 @@ const App: React.FC = () => {
       });
   };
 
-  // --- YÜKLENİYOR ---
-  if (isLoading) {
+  // --- YÜKLENİYOR ve HATA EKRANI ---
+  if (isLoading || connectionError) {
       return (
-          <div className="flex h-screen items-center justify-center bg-slate-100 flex-col">
-              <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-4"/>
-              <p className="text-slate-600 font-bold">BOSFOR ERP</p>
-              <p className="text-slate-400 text-sm mt-2">Veritabanına bağlanılıyor...</p>
+          <div className="flex h-screen items-center justify-center bg-slate-900 flex-col text-white p-8 text-center">
+              {connectionError ? (
+                  <>
+                      <div className="bg-red-500 p-4 rounded-full mb-6 animate-pulse">
+                          <AlertTriangle size={48} />
+                      </div>
+                      <h1 className="text-3xl font-bold mb-4">Veritabanı Bağlantı Hatası</h1>
+                      <div className="bg-slate-800 p-6 rounded-lg max-w-2xl border border-red-500/50">
+                          <p className="text-red-300 font-mono text-lg mb-4">{connectionError}</p>
+                          <div className="text-left text-sm text-slate-300 space-y-2">
+                              <p className="font-bold text-white">Çözüm İçin Yapılması Gerekenler:</p>
+                              <ol className="list-decimal list-inside space-y-1">
+                                  <li>Firebase Console'a gidin (console.firebase.google.com).</li>
+                                  <li>Projenizi seçin ve sol menüden <strong>Build {'>'} Firestore Database</strong>'e tıklayın.</li>
+                                  <li>Üstteki sekmelerden <strong>Rules (Kurallar)</strong> sekmesine gelin.</li>
+                                  <li>Mevcut kodları silin ve aşağıdakini yapıştırıp <strong>Publish (Yayınla)</strong> deyin:</li>
+                              </ol>
+                              <pre className="bg-black p-3 rounded mt-2 font-mono text-green-400">
+{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}`}
+                              </pre>
+                              <p className="mt-4 text-xs text-slate-500">* Not: Bu kural test amaçlıdır ve herkesin okuma/yazma yapmasına izin verir.</p>
+                          </div>
+                      </div>
+                      <button onClick={() => window.location.reload()} className="mt-8 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors">
+                          Tekrar Dene
+                      </button>
+                  </>
+              ) : (
+                <>
+                    <Loader2 className="w-16 h-16 animate-spin text-blue-500 mb-6"/>
+                    <h2 className="text-2xl font-bold">BOSFOR ERP PRO</h2>
+                    <p className="text-slate-400 mt-2">Sunucuya bağlanılıyor ve veriler senkronize ediliyor...</p>
+                </>
+              )}
           </div>
       );
   }
@@ -324,9 +364,9 @@ const App: React.FC = () => {
                 <button onClick={() => setLanguage('RU')} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'RU' ? 'bg-blue-600 text-white shadow-md' : 'bg-white/80 text-slate-700 hover:bg-white'}`}>RU</button>
             </div>
             {/* Bağlantı Durumu Göstergesi */}
-            <div className={`fixed bottom-4 left-4 text-xs p-2 rounded shadow flex items-center transition-colors ${isOfflineMode ? 'bg-orange-100 text-orange-700' : 'bg-white/80 text-slate-400'}`}>
-                {isOfflineMode ? <WifiOff size={14} className="mr-2"/> : <Database size={14} className="mr-2"/>}
-                Durum: {dbStatus}
+            <div className="fixed bottom-4 left-4 text-xs p-2 rounded shadow flex items-center transition-colors bg-white/90 text-slate-600 font-medium">
+                <Database size={14} className="mr-2 text-green-600"/>
+                {dbStatus}
             </div>
         </>
       );
@@ -358,7 +398,10 @@ const App: React.FC = () => {
                  <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
                     {t(currentView.toLowerCase()) || currentView}
                  </h2>
-                 <p className="text-slate-500 mt-1">Management Console {isOfflineMode && <span className="text-orange-600 font-bold ml-2">(Çevrimdışı Mod)</span>}</p>
+                 <p className="text-slate-500 mt-1 flex items-center">
+                    <Wifi size={14} className="mr-1 text-green-500"/>
+                    Management Console ({dbStatus})
+                 </p>
             </div>
             <div className="flex items-center space-x-6">
                 <div className="flex bg-white rounded-lg shadow-sm border border-slate-200 p-1">
