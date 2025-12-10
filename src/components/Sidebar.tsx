@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   LayoutDashboard, 
@@ -92,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onL
             <span className="font-medium">{t('logout')}</span>
         </button>
         <div className="mt-4 text-center text-xs text-slate-600">
-            v1.3.0 (Auth)
+            v1.3.1 (Netlify Fix)
         </div>
       </div>
     </aside>
