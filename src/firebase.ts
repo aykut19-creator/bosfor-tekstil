@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// BURAYI KONTROL EDİN: Bu bilgiler sizin Firebase projenize ait olmalı.
+// Sizin sağladığınız Firebase yapılandırması
 const firebaseConfig = {
   apiKey: "AIzaSyDyzqGDcTVJU1HIPRQO8KKRh-dQZDZskzM",
   authDomain: "bosfor-tekstil-79352.firebaseapp.com",
@@ -13,4 +13,6 @@ const firebaseConfig = {
 
 // Firebase başlatma
 const app = initializeApp(firebaseConfig);
+
+// Veritabanı bağlantısı
 export const db = getFirestore(app);
