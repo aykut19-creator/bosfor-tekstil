@@ -1,20 +1,22 @@
+/// <reference types="vite/client" />
 // @ts-ignore
 import { initializeApp } from "firebase/app";
 // @ts-ignore
 import { getFirestore } from "firebase/firestore";
 
-// Sizin sağladığınız Firebase yapılandırması
+// Firebase configuration using environment variables
+// These keys must be set in Netlify Site Settings > Build & deploy > Environment variables
 export const firebaseConfig = {
-  apiKey: "AIzaSyDyzqGDcTVJU1HIPRQO8KKRh-dQZDZskzM",
-  authDomain: "bosfor-tekstil-79352.firebaseapp.com",
-  projectId: "bosfor-tekstil-79352",
-  storageBucket: "bosfor-tekstil-79352.firebasestorage.app",
-  messagingSenderId: "906908262702",
-  appId: "1:906908262702:web:37803b23210fdaf5131abf"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Firebase başlatma
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Veritabanı bağlantısı
+// Database connection
 export const db = getFirestore(app);
