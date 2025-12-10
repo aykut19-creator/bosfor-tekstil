@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { View, AppState, Product, Customer, Order, Transaction, OrderStatus, Currency, Supplier, Language, User } from './types';
 import { initialProducts, initialCustomers, initialOrders, initialTransactions, initialSuppliers, initialUsers } from './services/mockData';
 import { dictionary } from './services/translations';
-import { db } from './firebase'; 
+import { db, firebaseConfig } from './firebase'; 
 import { doc, setDoc, onSnapshot } from "firebase/firestore"; 
 
 // Pages
@@ -20,14 +20,16 @@ import { ReportsView } from './components/pages/ReportsView';
 import { UserManagementView } from './components/pages/UserManagementView';
 import { AIChat } from './components/AIChat';
 import { Auth } from './components/Auth';
-import { LogOut, Loader2, Database, Wifi, AlertTriangle } from 'lucide-react'; 
+import { LogOut, Loader2, Database, Wifi, AlertTriangle, ExternalLink, RefreshCw, CheckCircle2 } from 'lucide-react'; 
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [language, setLanguage] = useState<Language>('TR');
   const [isLoading, setIsLoading] = useState(true);
   const [dbStatus, setDbStatus] = useState<string>('Sunucuya Bağlanıyor...');
+  const [dbStatusColor, setDbStatusColor] = useState<'text-slate-500' | 'text-green-600' | 'text-red-500' | 'text-yellow-600'>('text-slate-500');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [showSaveToast, setShowSaveToast] = useState(false);
   
   const t = (key: string) => dictionary[language][key] || key;
 
@@ -43,27 +45,32 @@ const App: React.FC = () => {
   });
 
   // --- FIREBASE VERİ SENKRONİZASYONU ---
-  // Bu bölüm programın kalbidir. Veritabanındaki değişiklikleri anlık olarak çeker.
   useEffect(() => {
+    connectToDatabase();
+  }, []);
+
+  const connectToDatabase = () => {
+    setIsLoading(true);
+    setConnectionError(null);
     setDbStatus('Veri Senkronizasyonu Başlatılıyor...');
+    setDbStatusColor('text-yellow-600');
     
     const unsubscribe = onSnapshot(doc(db, "erp_data", "main_state"), (docSnapshot) => {
         if (docSnapshot.exists()) {
             console.log("Güncel veri sunucudan alındı.");
             const data = docSnapshot.data() as AppState;
             
-            // Veriyi state'e yükle (Mevcut oturumu koruyarak)
             setState(prev => ({
                 ...data,
-                currentUser: prev.currentUser // Oturum bilgisini local state'den koru
+                currentUser: prev.currentUser 
             }));
             
             setDbStatus('Online (Canlı Bağlantı)');
+            setDbStatusColor('text-green-600');
             setConnectionError(null);
             setIsLoading(false);
         } else {
             console.log("Veritabanı boş, ilk kurulum başlatılıyor...");
-            // Eğer veritabanı tamamen boşsa, başlangıç verilerini yükle
             const initialState = {
                 users: initialUsers,
                 currentUser: null,
@@ -74,53 +81,60 @@ const App: React.FC = () => {
                 transactions: initialTransactions,
             };
             
-            // İlk veriyi Firebase'e yaz
             setDoc(doc(db, "erp_data", "main_state"), initialState)
               .then(() => {
                   console.log("İlk veriler veritabanına yazıldı.");
                   setDbStatus('Kurulum Tamamlandı');
+                  setDbStatusColor('text-green-600');
               })
               .catch(e => {
                   console.error("Yazma Hatası:", e);
                   setConnectionError("Veri yazılamadı. Lütfen Firebase Kurallarını kontrol edin.");
+                  setDbStatus('Yazma Hatası');
+                  setDbStatusColor('text-red-500');
               });
             
-            // UI'ı güncelle
             setState(initialState);
             setIsLoading(false);
         }
     }, (error) => {
         console.error("Firebase Bağlantı Hatası:", error);
-        // Hata durumunda kullanıcıyı bilgilendir
         if (error.code === 'permission-denied') {
-             setConnectionError("Erişim Reddedildi! Firebase Kurallarını 'allow read, write: if true;' yapmalısınız.");
+             setConnectionError("Erişim Reddedildi! Firebase Kuralları hala kısıtlı olabilir.");
         } else {
              setConnectionError(`Bağlantı Hatası: ${error.message}`);
         }
         setDbStatus('Bağlantı Koptu');
+        setDbStatusColor('text-red-500');
         setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  };
 
   // --- VERİ KAYDETME FONKSİYONU ---
-  // State'i güncelleyen ve Firebase'e gönderen merkezi fonksiyon
   const updateState = (updater: (prev: AppState) => AppState) => {
       setState(prev => {
           const newState = updater(prev);
           
-          // Oturum bilgisi hariç tüm veriyi veritabanına gönder
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { currentUser, ...dataToSave } = newState;
           
           setDbStatus('Kaydediliyor...');
+          setDbStatusColor('text-yellow-600');
           
           setDoc(doc(db, "erp_data", "main_state"), dataToSave, { merge: true })
-            .then(() => setDbStatus('Online (Senkronize)'))
+            .then(() => {
+                setDbStatus('Online (Senkronize)');
+                setDbStatusColor('text-green-600');
+                // Show toast
+                setShowSaveToast(true);
+                setTimeout(() => setShowSaveToast(false), 2000);
+            })
             .catch(e => {
                 console.error("Kayıt hatası:", e);
                 setDbStatus('Kayıt Hatası!');
+                setDbStatusColor('text-red-500');
                 alert("Veri kaydedilemedi! İnternet bağlantınızı veya yetkilerinizi kontrol edin.");
             });
 
@@ -135,7 +149,6 @@ const App: React.FC = () => {
   };
 
   const handleRegister = (newUser: Omit<User, 'id' | 'status'>) => {
-      // Eğer sistemde hiç kullanıcı yoksa ilk kullanıcıyı Admin yap
       const isFirstUser = state.users.length === 0;
       
       const user: User = {
@@ -145,7 +158,6 @@ const App: React.FC = () => {
           role: isFirstUser ? 'admin' : 'user'
       };
       
-      // Veritabanına kaydet
       updateState(prev => ({ ...prev, users: [...prev.users, user] }));
       
       if (isFirstUser) {
@@ -206,11 +218,10 @@ const App: React.FC = () => {
   const updateTransaction = (updatedTx: Transaction) => updateState(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === updatedTx.id ? updatedTx : t) }));
   const deleteTransaction = (id: string) => updateState(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
 
-  // Bakiyeleri dinamik hesapla (Veritabanından gelen işlem geçmişine göre)
+  // Bakiyeleri dinamik hesapla
   useEffect(() => {
     if (isLoading) return; 
     
-    // İşlemlerden bakiye hesapla
     const calculateBalanceImpact = (t: Transaction): { custImpact: number, suppImpact: number } => {
         let custImpact = 0;
         let suppImpact = 0;
@@ -224,7 +235,6 @@ const App: React.FC = () => {
         return { custImpact, suppImpact };
     };
 
-    // Bu işlem local state'i günceller ancak DB'ye yazmaz (DB'de transactions esastır)
     setState(prev => {
         const newCustomers = prev.customers.map(c => {
             const balance = prev.transactions
@@ -239,7 +249,6 @@ const App: React.FC = () => {
             return { ...s, balanceUsd: balance };
         });
         
-        // Sadece değişiklik varsa güncelle (Render döngüsünü engellemek için)
         if (JSON.stringify(newCustomers) !== JSON.stringify(prev.customers) || JSON.stringify(newSuppliers) !== JSON.stringify(prev.suppliers)) {
             return { ...prev, customers: newCustomers, suppliers: newSuppliers };
         }
@@ -319,29 +328,29 @@ const App: React.FC = () => {
                       <div className="bg-slate-800 p-6 rounded-lg max-w-2xl border border-red-500/50">
                           <p className="text-red-300 font-mono text-lg mb-4">{connectionError}</p>
                           <div className="text-left text-sm text-slate-300 space-y-2">
-                              <p className="font-bold text-white">Çözüm İçin Yapılması Gerekenler:</p>
-                              <ol className="list-decimal list-inside space-y-1">
-                                  <li>Firebase Console'a gidin (console.firebase.google.com).</li>
-                                  <li>Projenizi seçin ve sol menüden <strong>Build {'>'} Firestore Database</strong>'e tıklayın.</li>
-                                  <li>Üstteki sekmelerden <strong>Rules (Kurallar)</strong> sekmesine gelin.</li>
-                                  <li>Mevcut kodları silin ve aşağıdakini yapıştırıp <strong>Publish (Yayınla)</strong> deyin:</li>
+                              <p className="font-bold text-white mb-2">Sorun Nasıl Çözülür?</p>
+                              <ol className="list-decimal list-inside space-y-2 mb-4">
+                                  <li>Hata ekranı görüyorsanız, Firebase Kurallarınız (Rules) "false" olabilir veya "Publish" işlemi tamamlanmamış olabilir.</li>
+                                  <li>Aşağıdaki <strong>Firebase Konsolunu Aç</strong> butonuna tıklayın.</li>
+                                  <li><strong>Rules</strong> sekmesine gidin.</li>
+                                  <li>Ekranda kırmızı bir uyarı olsa bile, kodunuz <code>allow read, write: if true;</code> şeklinde olmalıdır.</li>
+                                  <li><strong>Publish</strong> butonuna bastığınızdan emin olun.</li>
                               </ol>
-                              <pre className="bg-black p-3 rounded mt-2 font-mono text-green-400">
-{`rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}`}
-                              </pre>
-                              <p className="mt-4 text-xs text-slate-500">* Not: Bu kural test amaçlıdır ve herkesin okuma/yazma yapmasına izin verir.</p>
                           </div>
                       </div>
-                      <button onClick={() => window.location.reload()} className="mt-8 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors">
-                          Tekrar Dene
-                      </button>
+                      <div className="flex gap-4 mt-8">
+                        <a 
+                            href={`https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-colors flex items-center"
+                        >
+                            <ExternalLink size={18} className="mr-2"/> Firebase Konsolunu Aç
+                        </a>
+                        <button onClick={() => connectToDatabase()} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors flex items-center">
+                            <RefreshCw size={18} className="mr-2"/> Bağlantıyı Tekrar Dene
+                        </button>
+                      </div>
                   </>
               ) : (
                 <>
@@ -364,8 +373,8 @@ service cloud.firestore {
                 <button onClick={() => setLanguage('RU')} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'RU' ? 'bg-blue-600 text-white shadow-md' : 'bg-white/80 text-slate-700 hover:bg-white'}`}>RU</button>
             </div>
             {/* Bağlantı Durumu Göstergesi */}
-            <div className="fixed bottom-4 left-4 text-xs p-2 rounded shadow flex items-center transition-colors bg-white/90 text-slate-600 font-medium">
-                <Database size={14} className="mr-2 text-green-600"/>
+            <div className={`fixed bottom-4 left-4 text-xs p-2 rounded shadow flex items-center transition-colors bg-white/90 font-medium ${dbStatusColor}`}>
+                <Database size={14} className="mr-2"/>
                 {dbStatus}
             </div>
         </>
@@ -390,17 +399,26 @@ service cloud.firestore {
   };
 
   return (
-    <div className="flex bg-slate-50 min-h-screen font-sans">
+    <div className="flex bg-slate-50 min-h-screen font-sans relative">
       <Sidebar currentView={currentView} onChangeView={setCurrentView} onLogout={handleLogout} currentUser={state.currentUser} t={t} />
+      
+      {/* SUCCESS TOAST */}
+      {showSaveToast && (
+          <div className="fixed top-6 right-6 z-[100] bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl flex items-center animate-in fade-in slide-in-from-top-4 duration-300">
+              <CheckCircle2 size={24} className="mr-2"/>
+              <span className="font-bold">Kayıt Başarılı</span>
+          </div>
+      )}
+
       <main className="flex-1 ml-64 p-8">
         <header className="mb-8 flex justify-between items-center">
             <div>
                  <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
                     {t(currentView.toLowerCase()) || currentView}
                  </h2>
-                 <p className="text-slate-500 mt-1 flex items-center">
-                    <Wifi size={14} className="mr-1 text-green-500"/>
-                    Management Console ({dbStatus})
+                 <p className={`mt-1 flex items-center text-sm font-medium ${dbStatusColor}`}>
+                    <Wifi size={14} className="mr-1"/>
+                    Database: {dbStatus}
                  </p>
             </div>
             <div className="flex items-center space-x-6">

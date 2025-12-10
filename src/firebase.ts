@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 // Sizin sağladığınız Firebase yapılandırması
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDyzqGDcTVJU1HIPRQO8KKRh-dQZDZskzM",
   authDomain: "bosfor-tekstil-79352.firebaseapp.com",
   projectId: "bosfor-tekstil-79352",
