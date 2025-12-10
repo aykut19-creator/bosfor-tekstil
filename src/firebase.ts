@@ -15,8 +15,24 @@ export const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Validate config to prevent white screen of death
+const isConfigValid = Object.values(firebaseConfig).every(value => !!value);
 
-// Database connection
-export const db = getFirestore(app);
+if (!isConfigValid) {
+  console.error("Firebase Environment Variables are missing! Please check Netlify settings.");
+}
+
+// Initialize Firebase
+// We use a try-catch block to prevent the entire app from crashing during build/start if keys are missing
+let app;
+let dbInstance;
+
+try {
+  app = initializeApp(firebaseConfig);
+  dbInstance = getFirestore(app);
+} catch (error) {
+  console.error("Failed to initialize Firebase:", error);
+}
+
+// Export database connection
+export const db = dbInstance;
